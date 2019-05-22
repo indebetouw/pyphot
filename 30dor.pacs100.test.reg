@@ -1,0 +1,6 @@
+# Region file format: DS9 version 4.1
+# Filename: 30dor.p100.fits
+global color=green dashlist=8 3 width=1 font="helvetica 10 normal" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1
+fk5
+circle(84.720955,-69.077281,8.6857959")
+polygon(84.699406,-69.07475,84.690925,-69.077018,84.68772,-69.080857,84.689478,-69.085032,84.695259,-69.08584,84.709587,-69.081886,84.711971,-69.077576)

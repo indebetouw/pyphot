@@ -438,7 +438,7 @@ class Region:
         self.bg0coords=[] # inner part of annulus
         self.bg1coords=[] # outer part of annulus
         self.mask=None
-        self.debug=True
+        self.debug=False
 
     #-------------------------------------------------------
     def setcircle(self,args):
@@ -640,7 +640,7 @@ class Region:
         if xra[1]>s[1]: xra[1]=s[1]
         if yra[1]>s[0]: yra[1]=s[0]
 
-        return xra[0],yra[0],xra[1],yra[1]
+        return int(xra[0]),int(yra[0]),int(xra[1]),int(yra[1])
         
 
             
@@ -867,7 +867,7 @@ class Region:
             pl.colorbar()
         
             pl.subplot(224)
-            subim=hextract(im,[xlim[0],ylim[0],xlim[1],ylim[1]])
+            subim=hextract(im,[int(xlim[0]),int(ylim[0]),int(xlim[1]),int(ylim[1])])
             im=subim[0]
             s=im.shape
             # don't mess with "extent" it screws up where the pixel centers are
@@ -902,7 +902,7 @@ class Region:
         # if hdu 0 has no data, go to hext hdu - if wcs is in hdu0 and data
         # in hdu1 then we'll be in trouble.
         i=0
-        while f[i].data==None: i=i+1
+        while len(f[i].data)<1: i=i+1
 
         import pyregion
         pyreg=pyregion.open(regfile)
@@ -911,7 +911,10 @@ class Region:
         self.setpoly(pyreg[1].coord_list)
         if fig: pl.figure()
         self.selftest(f[i],fig=fig)
-        
+
+        print "press enter"
+        x=raw_input()
+
         print ("a circle region")
         self.setcircle(pyreg[0].coord_list)
         if fig: pl.figure()
@@ -933,7 +936,7 @@ def loadims(imfiles):
         # if hdu 0 has no data, go to hext hdu - if wcs is in hdu0 and data
         # in hdu1 then we'll be in trouble.
         i=0
-        while im[i].data==None: i=i+1
+        while len(im[i].data)<1: i=i+1
 #        z=pl.where(pl.isnan(im[i].data))
 #        pdb.set_trace()
 #        im[i].data[z[0]]=0.
@@ -995,7 +998,7 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both"):
                 # ugh need minmax of aperture region...
                 # estimate as inner 1/2 for now
                 s=im.shape
-                z=im.data[s[0]*0.25:s[0]*0.75,s[1]*0.25:s[1]*0.75]
+                z=im.data[int(s[0]*0.25):int(s[0]*0.75),int(s[1]*0.25):int(s[1]*0.75)]
                 if len(z[0])<=0:
                     print z
 
