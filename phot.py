@@ -860,7 +860,7 @@ class Region:
             pl.title("image coords")
         
             pl.subplot(223)
-            pl.imshow(r.setmask(im),origin="bottom",interpolation="nearest")
+            pl.imshow(self.setmask(im),origin="bottom",interpolation="nearest")
             pl.xlim(xlim)
             pl.ylim(ylim)
             pl.title("image mask")
