@@ -27,13 +27,13 @@ def hextract(hin,crds,outfile=None):
         y00=y0
         if x0<0: x0=0
         if y0<0: y0=0
-        print "blc (%f,%f) is out of bounds, correcting to (%f,%f)" % (x00,y00,x0,y0)
+        print("blc (%f,%f) is out of bounds, correcting to (%f,%f)" % (x00,y00,x0,y0))
     if x1>(imshape[1]-1) or y1>(imshape[0]-1):
         x10=x1
         y10=y1
         if x1>(imshape[1]-1): x1=imshape[1]-1
         if y1>(imshape[0]-1): y1=imshape[0]-1
-        print "trc (%f,%f) is out of bounds, correcting to (%f,%f)" % (x10,y10,x1,y1)
+        print("trc (%f,%f) is out of bounds, correcting to (%f,%f)" % (x10,y10,x1,y1))
         
     # translate cdelt to center
     from astropy import wcs
@@ -84,8 +84,8 @@ def photcombine(a_wave,a_f,a_df,a_fl,c_wave,c_f,c_df,c_fl,f_wave,f_dwave,edit=Fa
             if len(c_ul)>1:
                 d=abs(c_wave[c_ul]-f_wave[i])
                 closest_c_ul=c_det[ pl.where(d==d.min())[0] ]
-                print "ambiguous catalog upper limits, choosing %f for fitter %f" % (c_wave[closest_c_ul], f_wave[i])
-                print "     set=",c_wave[c_ul]
+                print("ambiguous catalog upper limits, choosing %f for fitter %f" % (c_wave[closest_c_ul], f_wave[i]))
+                print("     set=",c_wave[c_ul])
             else:
                 closest_c_ul=c_ul
         else:
@@ -97,8 +97,8 @@ def photcombine(a_wave,a_f,a_df,a_fl,c_wave,c_f,c_df,c_fl,f_wave,f_dwave,edit=Fa
             if len(a_ul)>1:
                 d=abs(a_wave[a_ul]-f_wave[i])
                 closest_a_ul=a_det[ pl.where(d==d.min())[0] ]
-                print "ambiguous apphot upper limits, choosing %f for fitter %f" % (a_wave[closest_a_ul], f_wave[i])
-                print "     set=",a_wave[a_ul]
+                print("ambiguous apphot upper limits, choosing %f for fitter %f" % (a_wave[closest_a_ul], f_wave[i]))
+                print("     set=",a_wave[a_ul])
             else:
                 closest_a_ul=a_ul
         else:
@@ -110,8 +110,8 @@ def photcombine(a_wave,a_f,a_df,a_fl,c_wave,c_f,c_df,c_fl,f_wave,f_dwave,edit=Fa
             if len(a_det)>1:
                 d=abs(a_wave[a_det]-f_wave[i])
                 closest_a_det=a_det[ pl.where(d==d.min())[0] ]
-                print "ambiguous apphot photometry, choosing %f for fitter %f" % (a_wave[closest_a_det], f_wave[i])
-                print "     set=",a_wave[a_det]
+                print("ambiguous apphot photometry, choosing %f for fitter %f" % (a_wave[closest_a_det], f_wave[i]))
+                print("     set=",a_wave[a_det])
             else:
                 closest_a_det=a_det
         else:
@@ -123,8 +123,8 @@ def photcombine(a_wave,a_f,a_df,a_fl,c_wave,c_f,c_df,c_fl,f_wave,f_dwave,edit=Fa
             if len(c_det)>1:
                 d=abs(c_wave[c_det]-f_wave[i])
                 closest_c_det=c_det[ pl.where(d==d.min())[0] ]
-                print "ambiguous catalog photometry, choosing %f for fitter %f" % (c_wave[closest_c_det], f_wave[i])
-                print "     set=",c_wave[c_det]
+                print("ambiguous catalog photometry, choosing %f for fitter %f" % (c_wave[closest_c_det], f_wave[i]))
+                print("     set=",c_wave[c_det])
             else:
                 closest_c_det=c_det
         else:
@@ -149,7 +149,7 @@ def photcombine(a_wave,a_f,a_df,a_fl,c_wave,c_f,c_df,c_fl,f_wave,f_dwave,edit=Fa
                         f_fl[i]=1
                     else:
                         # there's an appdet _above_ the cat UL - WTF?
-                        print "apphot detection brighter than catalog UL at ",f_wave[i]
+                        print("apphot detection brighter than catalog UL at ",f_wave[i])
                         # assume apphot is wrong
                         f_f[i]=c_f[closest_c_ul]
                         f_df[i]=c_df[closest_c_ul]
@@ -197,7 +197,7 @@ def photcombine(a_wave,a_f,a_df,a_fl,c_wave,c_f,c_df,c_fl,f_wave,f_dwave,edit=Fa
                         f_fl[i]=1
                     else:
                         # there's an catdet _above_ the app UL - WTF?
-                        print "catalog detection brighter than appphot UL at ",f_wave[i]
+                        print("catalog detection brighter than appphot UL at ",f_wave[i])
                         # assume apphot is wrong
                         f_f[i]=c_f[closest_c_det]
                         f_df[i]=c_df[closest_c_det]
@@ -232,7 +232,7 @@ def photcombine(a_wave,a_f,a_df,a_fl,c_wave,c_f,c_df,c_fl,f_wave,f_dwave,edit=Fa
             if closest_c_det>=0:
                 if closest_a_det>=0:
                     # 2 dets -average
-                    f_f[i] =0.5( c_f[closest_c_det]+a_f[closest_a_det] )
+                    f_f[i] =0.5*( c_f[closest_c_det]+a_f[closest_a_det] )
                     f_df[i]=max([ c_df[closest_c_det],
                                   a_df[closest_a_det],
                                   abs(c_f[closest_c_det]-a_f[closest_a_det]) ])
@@ -241,7 +241,7 @@ def photcombine(a_wave,a_f,a_df,a_fl,c_wave,c_f,c_df,c_fl,f_wave,f_dwave,edit=Fa
                     # cat det; is there an app UL?
                     if closest_a_ul>=0:
                         if a_f[closest_a_ul]<=c_f[closest_c_det]:
-                            print "apphot UL below cat detection at ",f_wave[i]
+                            print("apphot UL below cat detection at ",f_wave[i])
                             # in case of discrepency, assum cat correct
                         f_f[i]=c_f[closest_c_det]
                         f_df[i]=c_df[closest_c_det]
@@ -338,7 +338,7 @@ def photcombine(a_wave,a_f,a_df,a_fl,c_wave,c_f,c_df,c_fl,f_wave,f_dwave,edit=Fa
             if d1.min()<=d3.min():
                 whatpoint=pl.where(d1==d1.min())[0][0]
                 whatx=x1[whatpoint]
-                print "deleting detection %d @ "%whatpoint,whatx
+                print("deleting detection %d @ "%whatpoint,whatx)
                 fit_1.set_data(pl.delete(x1,whatpoint),pl.delete(y1,whatpoint))
                 # delete the uncert error line too
 #                ds_1=abs(event.xdata-xs_1)
@@ -350,7 +350,7 @@ def photcombine(a_wave,a_f,a_df,a_fl,c_wave,c_f,c_df,c_fl,f_wave,f_dwave,edit=Fa
             else:
                 whatpoint=pl.where(d3==d3.min())[0][0]
                 whatx=x3[whatpoint]
-                print "deleting UL %d @ "%whatpoint,whatx
+                print("deleting UL %d @ "%whatpoint,whatx)
                 x3=pl.delete(x3,whatpoint)
                 y3=pl.delete(y3,whatpoint)
                 fit_3.set_data(x3,y3)
@@ -394,7 +394,7 @@ def photcombine(a_wave,a_f,a_df,a_fl,c_wave,c_f,c_df,c_fl,f_wave,f_dwave,edit=Fa
         cid0=pl.connect('button_press_event',click)
         cid1=pl.connect('button_release_event',unclick)
     
-        print "edit fitter points and then press enter in the terminal"
+        print("edit fitter points and then press enter in the terminal")
         x=raw_input()
     
         pl.disconnect(cid0)
@@ -402,7 +402,7 @@ def photcombine(a_wave,a_f,a_df,a_fl,c_wave,c_f,c_df,c_fl,f_wave,f_dwave,edit=Fa
 
     if not fit_3==None:
         x3,y3=fit_3.get_data()
-        print "upper limits are now:",x3,y3
+        print("upper limits are now:",x3,y3)
     
         for j in range(len(x3)):
             d=abs(f_wave-x3[j])
@@ -412,7 +412,7 @@ def photcombine(a_wave,a_f,a_df,a_fl,c_wave,c_f,c_df,c_fl,f_wave,f_dwave,edit=Fa
             f_df[z]=0.999 # XXXX
     
     x1,y1=fit_1.get_data()
-    print "detections are now:",x1,y1
+    print("detections are now:",x1,y1)
 
     for j in range(len(x1)):
         d=abs(f_wave-x1[j])
@@ -432,7 +432,7 @@ def photcombine(a_wave,a_f,a_df,a_fl,c_wave,c_f,c_df,c_fl,f_wave,f_dwave,edit=Fa
 #===========================================================================
 class Region:
     def __init__(self):
-        self.bgfact=[2,2.5]
+        self.bgfact=[2,2.5]  # bg annulus radii as multipliers of phot rad.
         self.type=None
         self.coords=[]
         self.bg0coords=[] # inner part of annulus
@@ -560,7 +560,7 @@ class Region:
                 r=ci[2] # in pix
                 pl.plot(ci[0]+r*ct, ci[1]+r*st)
 
-            # point north:  XXX TODO make general
+            # indicate north:  XXX TODO make general
             from astropy import wcs
             w=wcs.WCS(im.header)
             # use origin=0 i.e. NOT FITS convention, but pl.imshow sets origin
@@ -609,16 +609,33 @@ class Region:
                 
 
     #-------------------------------------------------------
-    def imextents(self,im,buffer=1.):
+    def apdiam(self,im):
         """
-        extents in pixel space - buffer in units of inner ap radius
+        diam of phot ap in pixels 
+        """
+        ca=self.imcoords(im,reg="ap")
+        if self.type=="circle":
+            diam=2*ca[2]
+        elif self.type=="polygon":                
+            dx=minmax(ca[0,:])
+            dy=minmax(ca[1,:])
+            ddx=dx[1]-dx[0]
+            ddy=dy[1]-dy[0]
+            diam=max(ddx,ddy)
+        return(diam)
+
+        
+    #-------------------------------------------------------
+    def imextents(self,im,buffr=1.):
+        """
+        extents in pixel space with bg - buffr in units of inner ap radius
         """
         ca=self.imcoords(im,reg="ap")
         c1=self.imcoords(im,reg="bg1") # outer bg
         if self.type=="circle":
             dr=ca[2]
-            xra=c1[0] + (dr*buffer+ c1[2])*pl.array([-1,1])
-            yra=c1[1] + (dr*buffer+ c1[2])*pl.array([-1,1])
+            xra=c1[0] + (dr*buffr+ c1[2])*pl.array([-1,1])
+            yra=c1[1] + (dr*buffr+ c1[2])*pl.array([-1,1])
         elif self.type=="polygon":                
             dx=minmax(ca[0,:])
             dy=minmax(ca[1,:])
@@ -626,8 +643,8 @@ class Region:
             dx=dx[1]-dx[0]
             dy=dy[1]-dy[0]
             dr=0.5*max(dx,dy)
-            xra = minmax(c1[0,:]) +dr*buffer*pl.array([-1,1])
-            yra = minmax(c1[1,:]) +dr*buffer*pl.array([-1,1])
+            xra = minmax(c1[0,:]) +dr*buffr*pl.array([-1,1])
+            yra = minmax(c1[1,:]) +dr*buffr*pl.array([-1,1])
 
         xra[0]=pl.floor(xra[0])+1
         yra[0]=pl.floor(yra[0])+1
@@ -647,14 +664,15 @@ class Region:
 
 
     #-------------------------------------------------------
-    def setmask(self,im):
+    def setmask(self,im,offset=[0,0]):
         """
         input an image (for now an HDU) and set self.mask to 
         an array the size of the image with the phot region =1
           and expanded background annulus =2
         for now we also create a mask the size of the image, so I recommend
           to extract a subimage and call this method with that input
-        this method well trim the polyon to fit in the image
+        this method will trim the polyon to fit in the image
+        offset is extra offset in pixels 
         """
         imshape=im.shape
         mask=pl.zeros(imshape)
@@ -662,9 +680,12 @@ class Region:
         if self.type=="circle":
             x,y,r=self.imcoords(im) 
             x0=int(x); y0=int(y)
-            dx=x-x0; dy=y-y0
+            dx=x-x0+offset[0]  # fractional pixel offsets
+            dy=y-y0+offset[1]
             # grr pixel centers again - is this right?
-#            dx=dx-0.5; dy=dy-0.5
+            #            dx=dx-0.5; dy=dy-0.5
+
+            print(imshape,x,y,dx,dy)
             
             bg0_r=self.imcoords(im,reg="bg0")[2] #-0.2 # fudge
             bg1_r=self.imcoords(im,reg="bg1")[2] #+0.2 # fudge
@@ -713,24 +734,40 @@ class Region:
         self.mask=mask
         return mask
 
+
     #-------------------------------------------------------
-    def phot(self,im,showmask=True):
+    def photwiggle(self,im,showmask=True,offsetpix=1):
+        # offset by +- offsetpix to add to uncert
+        
+        rs = [self.phot(im,showmask,offset=[0,0])] # raw, bg, raw-bg*nin, uncert        
+        for i in [-1,1]:
+            for j in [-1,1]:
+                rs.append(self.phot(im,showmask=False,offset=np.array([i,j])*offsetpix))
+        rs=np.array(rs)
+        return np.nanmean(rs[:,0]), np.nanmean(rs[:,1]), np.nanmean(rs[:,2]), np.nanmax(rs[:,3])+np.nanstd(rs[:,2])
+
+    
+    #-------------------------------------------------------
+    def phot(self,im,showmask=True,offset=[0,0]):
         # TODO if we switch to astropy.photometry then we can have that 
         # do the work with subpixels properly, but for now they don't 
         # do rms of the bg correctly so we can't use their stuff yet.
 
-        mask=self.setmask(im)
+        mask=self.setmask(im,offset=offset)
 
         if showmask:
             cmap1=pl.matplotlib.colors.LinearSegmentedColormap.from_list('my_cmap',["black","blue"],2)
             cmap1._init()
-            cmap1._lut[:,-1] = pl.array([0,0.5,0,0,0])
-            pl.imshow(mask>0,origin="bottom",interpolation="nearest",cmap=cmap1)
+            cmap1._lut[:,-1] = pl.array([0,0.3,0,0,0])
+            pl.imshow(mask>0,origin="lower",interpolation="nearest",cmap=cmap1)
 
         from scipy import ndimage
         from scipy.ndimage import measurements as m
         nin=len(pl.where(mask==1)[0])
         nout=len(pl.where(mask==2)[0])
+
+        #print(nin,nout)
+        #pdb.set_trace()
 
         floor=pl.nanmin(im.data)
         if floor<0: floor=0
@@ -765,20 +802,19 @@ class Region:
         # assume uncert dominated by BG level.
         # TODO add sqrt(cts in source) Poisson - need gain or explicit err/pix
         uncert = bgsig*nin/pl.sqrt(nout)
-        
 
         results=raw, bg, raw-bg*nin, uncert
 
         
         f=self.photfactor(im)
         if f:
-            if self.debug: print "phot factor = ",f
+            if self.debug: print("phot factor = ",f)
             results=pl.array(results)*f
 
         if self.debug:
 #            print "max=", m.maximum(im.data,mask,1), m.maximum(im.data,mask,2)
 #            print "nin,nout=",nin,nout 
-            print "raw, bg, bgsubbed, uncert=", results
+            print("raw, bg, bgsubbed, uncert=", results)
             pdb.set_trace()
 
         return results
@@ -860,7 +896,7 @@ class Region:
             pl.title("image coords")
         
             pl.subplot(223)
-            pl.imshow(self.setmask(im),origin="bottom",interpolation="nearest")
+            pl.imshow(r.setmask(im),origin="lower",interpolation="nearest")
             pl.xlim(xlim)
             pl.ylim(ylim)
             pl.title("image mask")
@@ -871,7 +907,7 @@ class Region:
             im=subim[0]
             s=im.shape
             # don't mess with "extent" it screws up where the pixel centers are
-            pl.imshow(im.data,origin="bottom",interpolation="nearest")
+            pl.imshow(im.data,origin="lower",interpolation="nearest")
             pl.xlim([0,s[1]])
             pl.ylim([0,s[0]])
             self.plotimx(im)
@@ -879,7 +915,7 @@ class Region:
         self.phot(im)
         if fig:
             pl.subplot(222)
-            pl.imshow(self.mask,origin="bottom",interpolation="nearest")
+            pl.imshow(self.mask,origin="lower",interpolation="nearest")
             self.plotimx(im)
             pl.xlim([0,s[1]])
             pl.ylim([0,s[0]])
@@ -907,15 +943,15 @@ class Region:
         import pyregion
         pyreg=pyregion.open(regfile)
 
-        print ("a polygon region")
+        print("a polygon region")
         self.setpoly(pyreg[1].coord_list)
         if fig: pl.figure()
         self.selftest(f[i],fig=fig)
 
-        print "press enter"
+        print("press enter")
         x=raw_input()
 
-        print ("a circle region")
+        print("a circle region")
         self.setcircle(pyreg[0].coord_list)
         if fig: pl.figure()
         self.selftest(f[i],fig=fig)
@@ -930,12 +966,14 @@ def loadims(imfiles):
     import os.path
     imlist=[]
     for f in imfiles:
-        print f
+        print(f)
         if not os.path.exists(f): raise Exception("Need file "+f)
         im=pyfits.open(f)
         # if hdu 0 has no data, go to hext hdu - if wcs is in hdu0 and data
         # in hdu1 then we'll be in trouble.
         i=0
+        if len(im)>1: i=1 # some issues with multi-extension - the first is None
+        # if im[i].data==None: i=i+1
         while len(im[i].data)<1: i=i+1
 #        z=pl.where(pl.isnan(im[i].data))
 #        pdb.set_trace()
@@ -943,7 +981,7 @@ def loadims(imfiles):
         imlist.append(im[i])
     return imlist
         
-def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both"):
+def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",offsetfrac=0,buffr=1.):
     """
     give me a region and an imlist and tell me whether to plot cutouts
     """
@@ -952,18 +990,21 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both"):
     if panel==None: panel=[5,4,1] # for vertical page
     f=[]
     df=[]
+    bg=[]
     raw=[]
     for j in range(nim):  
         im=imlist[j]
         # if plotting, need to make image cutouts; even if not, this tells
         # us if the source is off the edge
-        xtents=r.imextents(imlist[j])
+        xtents=r.imextents(imlist[j],buffr=buffr)
         minsize=5
         if (xtents[3]-xtents[1])<minsize or (xtents[2]-xtents[0])<minsize:
             raw0,f0,df0=0,0,0
-            print "phot region too small - %f,%f less than %d pixels" % ((xtents[3]-xtents[1]),(xtents[2]-xtents[0]),minsize)
-            print xtents,r.imcoords(im,reg="bg1")
+            print("phot region too small - %f,%f less than %d pixels" % ((xtents[3]-xtents[1]),(xtents[2]-xtents[0]),minsize))
+            print(xtents,r.imcoords(im,reg="bg1"))
         else:
+            regdiameter=0.5*( (xtents[3]-xtents[1]) + (xtents[2]-xtents[0]) )
+            
             if plot: 
                 pl.subplot(panel[0],panel[1],panel[2])
                 im=hextract(imlist[j],xtents)[0]
@@ -975,8 +1016,11 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both"):
                     from scipy.ndimage.interpolation import rotate
                     if w.wcs.has_crota():
                         t0=w.wcs.crota[1]
+                    elif w.wcs.has_cd():
+                        t0=pl.arctan2(w.wcs.cd[0,1],-w.wcs.cd[0,0])*180/pl.pi
                     else:
-                        t0=pl.arctan2(w.wcs.cd[0,1],-w.wcs.cd[0,0])*180/pl.pi                
+                        t0=0.
+                        print("WARN: assuming CROTA2=0")
                     theta=-1*t0
                     im.data=rotate(im.data,theta,reshape=False)
                     ct=pl.cos(pl.pi*theta/180)
@@ -984,15 +1028,18 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both"):
                     if w.wcs.has_crota():
                         w.wcs.crota[1]=w.wcs.crota[1]+theta
                         im.header['CROTA2']=w.wcs.crota[1]
-                        print "rotating crota by "+str(theta)
-                    else:
+                        print("rotating crota by "+str(theta))
+                    elif w.wcs.has_cd():
                         w.wcs.cd=pl.matrix(w.wcs.cd)*pl.matrix([[ct,-st],[st,ct]])
                         im.header['CD1_1']=w.wcs.cd[0,0]
                         im.header['CD1_2']=w.wcs.cd[0,1]
                         im.header['CD2_1']=w.wcs.cd[1,0]
                         im.header['CD2_2']=w.wcs.cd[1,1]
-                        print "rotating cd    by "+str(theta)
-                    
+                        print("rotating cd    by "+str(theta))
+                    #else:
+                    #    print("WARN: not rotating CD")
+
+                        
                     #pdb.set_trace()
 
                 # ugh need minmax of aperture region...
@@ -1000,7 +1047,7 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both"):
                 s=im.shape
                 z=im.data[int(s[0]*0.25):int(s[0]*0.75),int(s[1]*0.25):int(s[1]*0.75)]
                 if len(z[0])<=0:
-                    print z
+                    print(z)
 
                 z=pl.where(pl.isnan(im.data))
                 if len(z[0])>0:
@@ -1010,15 +1057,15 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both"):
                     std=im.data.std()
                 rg=pl.median(im.data)+pl.array([-0.5,5])*std
                 # marta wants them less saturated
-                rg[1]=pl.nanmax(im.data)
+                # rg[1]=pl.nanmax(im.data)
 
                 if rg[0]<0: rg[0]=0
-                if rg[1]<=rg[0]:
-                     rg=[pl.nanmin(z),pl.nanmax(z)]
-                if showmask==False or showmask=="both": # show the jet one                    
-                    pl.imshow(im.data,origin="bottom",interpolation="nearest",vmin=rg[0],vmax=rg[1])
+                if rg[1]<rg[0]:
+                     rg=[pl.nanmin(im.data),pl.nanmax(im.data)]
+                if showmask==False or showmask=="both": # show the jet one 
+                    pl.imshow(im.data,origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1])
                 elif showmask==True: # only show the mask
-                    pl.imshow(im.data,origin="bottom",interpolation="nearest",vmin=rg[0],vmax=rg[1],cmap="YlGn")
+                    pl.imshow(im.data,origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1],cmap="YlGn")
                 ax=pl.gca()
                 ax.axes.get_xaxis().set_visible(False)
                 ax.axes.get_yaxis().set_visible(False)
@@ -1026,6 +1073,7 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both"):
                     pl.text(0.05, 0.99, names[j], horizontalalignment='left',
                             verticalalignment='top',
                             transform=ax.transAxes,
+                            fontsize="x-small",
                             bbox=dict(facecolor='white', alpha=0.5))
                 pl.xlim([-0.5,s[1]-0.5])
                 pl.ylim([-0.5,s[0]-0.5])
@@ -1038,8 +1086,8 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both"):
                     rg=pl.median(im.data)+pl.array([-0.5,5])*std
                     if rg[0]<0: rg[0]=0
                     if rg[1]<=rg[0]:
-                        rg=[pl.nanmin(z),pl.nanmax(z)]
-                    pl.imshow(im.data,origin="bottom",interpolation="nearest",vmin=rg[0],vmax=rg[1],cmap="YlGn")
+                        rg=[pl.nanmin(im.data),pl.nanmax(im.data)]
+                    pl.imshow(im.data,origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1],cmap="YlGn")
                     ax=pl.gca()
                     ax.axes.get_xaxis().set_visible(False)
                     ax.axes.get_yaxis().set_visible(False)
@@ -1047,6 +1095,7 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both"):
                         pl.text(0.05, 0.99, names[j], horizontalalignment='left',
                                 verticalalignment='top',
                                 transform=ax.transAxes,
+                                fontsize="x-small",
                                 bbox=dict(facecolor='white', alpha=0.5))
                     pl.xlim([-0.5,s[1]-0.5])
                     pl.ylim([-0.5,s[0]-0.5])
@@ -1054,16 +1103,20 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both"):
             if debug:
 #                r.debug=True
                 if names:
-                    print names[j]
-            
-            raw0,bg,f0,df0=r.phot(im)
+                    print(names[j])
+
+            if offsetfrac>0:
+                raw0,bg0,f0,df0=r.photwiggle(im,offsetpix=offsetfrac*r.apdiam(im))
+            else:
+                raw0,bg0,f0,df0=r.phot(im)
         raw.append(raw0)
         f.append(f0)
         df.append(df0)
+        bg.append(bg0)
         panel[2]=panel[2]+1
     if plot:
         pl.subplots_adjust(wspace=0.02,hspace=0.02,left=0.1,right=0.97,top=0.95,bottom=0.05)    
-    return f,df,raw
+    return f,df,raw,bg
             
 
 
