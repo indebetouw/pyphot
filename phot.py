@@ -686,6 +686,8 @@ class Region:
             #            dx=dx-0.5; dy=dy-0.5
 
             print(imshape,x,y,dx,dy)
+            if imshape[0]>300:
+                pdb.set_trace()
             
             bg0_r=self.imcoords(im,reg="bg0")[2] #-0.2 # fudge
             bg1_r=self.imcoords(im,reg="bg1")[2] #+0.2 # fudge
@@ -765,9 +767,6 @@ class Region:
         from scipy.ndimage import measurements as m
         nin=len(pl.where(mask==1)[0])
         nout=len(pl.where(mask==2)[0])
-
-        #print(nin,nout)
-        #pdb.set_trace()
 
         floor=pl.nanmin(im.data)
         if floor<0: floor=0
@@ -1005,60 +1004,60 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
         else:
             regdiameter=0.5*( (xtents[3]-xtents[1]) + (xtents[2]-xtents[0]) )
             
-            if plot: 
-                pl.subplot(panel[0],panel[1],panel[2])
-                im=hextract(imlist[j],xtents)[0]
-                ## ROTATE
-                rotate=True
-                if rotate:
-                    from astropy import wcs
-                    w=wcs.WCS(im.header)
-                    from scipy.ndimage.interpolation import rotate
-                    if w.wcs.has_crota():
-                        t0=w.wcs.crota[1]
-                    elif w.wcs.has_cd():
-                        t0=pl.arctan2(w.wcs.cd[0,1],-w.wcs.cd[0,0])*180/pl.pi
-                    else:
-                        t0=0.
-                        print("WARN: assuming CROTA2=0")
-                    theta=-1*t0
-                    im.data=rotate(im.data,theta,reshape=False)
-                    ct=pl.cos(pl.pi*theta/180)
-                    st=pl.sin(pl.pi*theta/180)
-                    if w.wcs.has_crota():
-                        w.wcs.crota[1]=w.wcs.crota[1]+theta
-                        im.header['CROTA2']=w.wcs.crota[1]
-                        print("rotating crota by "+str(theta))
-                    elif w.wcs.has_cd():
-                        w.wcs.cd=pl.matrix(w.wcs.cd)*pl.matrix([[ct,-st],[st,ct]])
-                        im.header['CD1_1']=w.wcs.cd[0,0]
-                        im.header['CD1_2']=w.wcs.cd[0,1]
-                        im.header['CD2_1']=w.wcs.cd[1,0]
-                        im.header['CD2_2']=w.wcs.cd[1,1]
-                        print("rotating cd    by "+str(theta))
+            pl.subplot(panel[0],panel[1],panel[2])
+            im=hextract(imlist[j],xtents)[0]
+            ## ROTATE
+            rotate=True
+            if rotate:
+                from astropy import wcs
+                w=wcs.WCS(im.header)
+                from scipy.ndimage.interpolation import rotate
+                if w.wcs.has_crota():
+                    t0=w.wcs.crota[1]
+                elif w.wcs.has_cd():
+                    t0=pl.arctan2(w.wcs.cd[0,1],-w.wcs.cd[0,0])*180/pl.pi
+                else:
+                    t0=0.
+                    print("WARN: assuming CROTA2=0")
+                theta=-1*t0
+                im.data=rotate(im.data,theta,reshape=False)
+                ct=pl.cos(pl.pi*theta/180)
+                st=pl.sin(pl.pi*theta/180)
+                if w.wcs.has_crota():
+                    w.wcs.crota[1]=w.wcs.crota[1]+theta
+                    im.header['CROTA2']=w.wcs.crota[1]
+                    print("rotating crota by "+str(theta))
+                elif w.wcs.has_cd():
+                    w.wcs.cd=pl.matrix(w.wcs.cd)*pl.matrix([[ct,-st],[st,ct]])
+                    im.header['CD1_1']=w.wcs.cd[0,0]
+                    im.header['CD1_2']=w.wcs.cd[0,1]
+                    im.header['CD2_1']=w.wcs.cd[1,0]
+                    im.header['CD2_2']=w.wcs.cd[1,1]
+                    print("rotating cd    by "+str(theta))
                     #else:
                     #    print("WARN: not rotating CD")
 
                         
                     #pdb.set_trace()
 
-                # ugh need minmax of aperture region...
-                # estimate as inner 1/2 for now
-                s=im.shape
-                z=im.data[int(s[0]*0.25):int(s[0]*0.75),int(s[1]*0.25):int(s[1]*0.75)]
-                if len(z[0])<=0:
-                    print(z)
+            # ugh need minmax of aperture region...
+            # estimate as inner 1/2 for now
+            s=im.shape
+            z=im.data[int(s[0]*0.25):int(s[0]*0.75),int(s[1]*0.25):int(s[1]*0.75)]
+            if len(z[0])<=0:
+                print(z)
 
-                z=pl.where(pl.isnan(im.data))
-                if len(z[0])>0:
-                    z=pl.where(pl.isnan(im.data)==False)
-                    std=im.data[z[0],z[1]].std()
-                else:
-                    std=im.data.std()
-                rg=pl.median(im.data)+pl.array([-0.5,5])*std
-                # marta wants them less saturated
-                # rg[1]=pl.nanmax(im.data)
+            z=pl.where(pl.isnan(im.data))
+            if len(z[0])>0:
+                z=pl.where(pl.isnan(im.data)==False)
+                std=im.data[z[0],z[1]].std()
+            else:
+                std=im.data.std()
+            rg=pl.median(im.data)+pl.array([-0.5,5])*std
+            # marta wants them less saturated
+            # rg[1]=pl.nanmax(im.data)
 
+            if plot: 
                 if rg[0]<0: rg[0]=0
                 if rg[1]<rg[0]:
                      rg=[pl.nanmin(im.data),pl.nanmax(im.data)]
