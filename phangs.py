@@ -8,38 +8,62 @@ import pylab as pl
 pl.ion() #interactive mode
 
 
+do_UL=False # turn low SNR detections into ULs
+
+phangs_apcorr=np.array([1.94,2.31,2.15,2.00,2.17, 1.78,1.87,1.86,1.85, 2,2,2,2])
+
+
 # region name for output files
-regname="ngc628"
-tj=Table.read('fitter.jimena.cat',format="ascii")
+regname='Phot_test_10_90_ul_off_ac_off_f_ext_off_annulus_2-2.5ap_mjyngc628c'
+regname='Phot_test_10_90_ul_off_ac_off_f_ext_off_annulus_2-4ap_mjy_sclip_5iterngc628c'
+regname='Phot_test_10_90_ul_off_ac_off_mjy_ngc628c'
+regname='Phot_test_10_90_ul_off_ac_off_f_ext_off_annulus_2-2.5ap_mjy_sclip_5iterngc628c'
+jtable=Table.read(regname+'.csv',format="ascii")
+j_apcorr=np.ones(13)
 
 #regname="ngc628.100Myr"
-#tj=Table.read('fitter.jimena.intermediate.cat',format="ascii")
+#jtable=Table.read('intermediate.csv',format="ascii")
+#j_apcorr=phangs_apcorr
 
-hstt=Table.read("IR4_ngc628c_human_subsample.csv",format="ascii")
-hstfcols= ['PHANGS_'+x+'_mJy_TOT' for x in ['F275W','F336W','F435W','F555W','F814W']]
-hstdfcols=['PHANGS_'+x+'_mJy_TOT_ERR' for x in ['F275W','F336W','F435W','F555W','F814W']]
+u=np.argsort(jtable['ID_phangs'])
+jtable=jtable[u]
+
+ra=jtable['raj2000']
+de=jtable['dej2000']
+sourcename=jtable['ID_phangs']
+
+filter_name=np.array(['F275W','F336W','F435W','F555W','F814W','F200W','F300M','F335M','F360M','F770W','F1000W','F1130W','F2100W'])
+
+jfcols=['flux_'+x for x in filter_name]
+jdfcols=['er_flux_9010_'+x for x in filter_name]
+# special case, no 9010:
+jdfcols[7]='er_flux_F335M'
+# this is in the whole annulus - would better as surface brightness etc
+jfbgcols=['flux_bkg_'+x for x in filter_name]
+
+jfbcols=['flux_'+x+'_b' for x in filter_name]
+
+
+hsttable=Table.read("IR4_ngc628c_human_subsample.csv",format="ascii")
+hstfcols= ['PHANGS_'+x+'_mJy_TOT' for x in filter_name[0:5]]
+hstdfcols=['PHANGS_'+x+'_mJy_TOT_ERR' for x in filter_name[0:5]]
 
 
 
-u=np.argsort(tj['col1'])
-tj=tj[u]
+        
 
-ra=tj['col2']
-de=tj['col3']
-sourcename=tj['col1']
-
-outdir=regname+".plots"
+outdir=regname+".plots/"
 if not os.path.exists(outdir):
     os.mkdir(outdir)
 
-apphot_band=['UV275','UV336','U438','V555','R814','F200','F300','F335','F360','F770','F1000','F1130','F2100']
 
+apphot_band=[x[:-1] for x in filter_name]
 apphot_wave=[.275,.336,.435,.555,.814, 2,3,3.35,3.6, 7.7,10,11.3,21]
 # 658: r=.076
 # 50%EE radii
 apphot_radius=np.array([.11,.067,.076,.068,.081, .042,.061,.070,.073, .17,.21,.24,.42])*2
 # "standard" radii adopted by jimena
-apphot_radius=np.array([.158,.158,.158,.158,.158, .124,.124,.124,.124, .17,.21,.24,.42])
+apphot_radius=np.array([.158,.158,.158,.158,.158, .124,.124,.124,.124, .168,.21,.24,.42])
 
 # jr
 # for all HST bands an  apertures of 0.158488" plus aperture corrections of
@@ -61,9 +85,9 @@ mdir="ims_2023b/"
 apphot_file=[mdir + s for s in [
     'ngc628c_uvis_f275w_err_drc_sci.Mjysr.fits',
     'ngc628c_uvis_f336w_err_drc_sci.Mjysr.fits',
-    'ngc628c_acs_f435w_err_drc_sci.Mjysr.fits',
-    'ngc628c_acs_f555w_err_drc_sci.Mjysr.fits',
-    'ngc628c_acs_f814w_err_drc_sci.Mjysr.fits',
+     'ngc628c_acs_f435w_err_drc_sci.Mjysr.fits',
+     'ngc628c_acs_f555w_err_drc_sci.Mjysr.fits',
+     'ngc628c_acs_f814w_err_drc_sci.Mjysr.fits',
     'ngc0628_nircam_lv3_f200w_i2d_align.fits',
     'ngc0628_nircam_lv3_f300m_i2d_align.fits',
     'ngc0628_nircam_lv3_f335m_i2d_align.fits',
@@ -104,9 +128,20 @@ wapp_raw =pl.zeros([nimage,nsrc])
 wapp_flag=pl.zeros([nimage,nsrc])
 wapp_bg  =pl.zeros([nimage,nsrc])
 
+# jimena
+jr_f   =pl.zeros([nimage,nsrc])
+jr_df  =pl.zeros([nimage,nsrc])
+jr_raw =pl.zeros([nimage,nsrc])
+jr_flag=pl.zeros([nimage,nsrc])
+jr_bg  =pl.zeros([nimage,nsrc])
 
-nsrc=10 # test
-#do_wiggle=False
+# HST cat
+cat_f   =pl.zeros([nimage,nsrc])
+cat_df  =pl.zeros([nimage,nsrc])
+
+
+#nsrc=40 # test
+do_wiggle=False
 
 
 for isrc in range(nsrc):
@@ -116,7 +151,12 @@ for isrc in range(nsrc):
 #    pl.show(block=False)
     r.debug=False
     debugph=r.debug
-
+    r.setbgfact([2,4])
+    # larger but thinner bg than 2,2.5
+    #r.setbgfact([3,3.2])
+    # jimena 21um
+    # r.setbgfact([3.40,3.67])
+    
 
     # go through aperture radii
     k=0
@@ -134,10 +174,7 @@ for isrc in range(nsrc):
         l=k
         while l<nimage and apphot_radius[l]==apphot_radius[k]: l=l+1
         r.setcircle([ra[isrc],de[isrc],apphot_radius[k]/3600.])
-        # larger but thinner bg than 2,2.5
-        #r.setbgfact([3,3.2])
-        # jimena 21um
-        # r.setbgfact([3.40,3.67])
+
         
 #        print "k=",k,l-1," r=",apphot_radius[k],apphot_radius[l-1]
 #        if k>=12:
@@ -181,28 +218,30 @@ for isrc in range(nsrc):
     flag=pl.ones(nimage)
     wflag=pl.ones(nimage)
 
-
-    z=pl.where((f>raw)*(apphot_wave>0))[0]
-    if len(z)>0:
-        flag[z]=3
-    # set nondet flags 
-    z=pl.where((f<=0)*(apphot_wave>0))[0]
-    if len(z)>0:
-        flag[z]=0        
     z=pl.where(pl.isnan(wf))[0]
     if len(z)>0:
         wflag[z]=0
-
     if do_wiggle:
-        z=pl.where((wf>wraw)*(apphot_wave>0))[0]
-        if len(z)>0:
-            wflag[z]=3
-        z=pl.where((wf<=0)*(apphot_wave>0))[0]
-        if len(z)>0:
-            wflag[z]=0 
         z=pl.where(pl.isnan(wf))[0]
         if len(z)>0:
             wflag[z]=0
+
+    if do_UL:
+        z=pl.where((f>raw)*(apphot_wave>0))[0]
+        if len(z)>0:
+            flag[z]=3
+        # set nondet flags 
+        z=pl.where((f<=0)*(apphot_wave>0))[0]
+        if len(z)>0:
+            flag[z]=0        
+    
+        if do_wiggle:
+            z=pl.where((wf>wraw)*(apphot_wave>0))[0]
+            if len(z)>0:
+                wflag[z]=3
+            z=pl.where((wf<=0)*(apphot_wave>0))[0]
+            if len(z)>0:
+                wflag[z]=0 
        
 
 
@@ -213,14 +252,16 @@ for isrc in range(nsrc):
     app_df[:,isrc]=df
     app_flag[:,isrc]=flag
     app_raw[:,isrc]=raw
-    app_bg[:,isrc]=bg
+    # app_bg[:,isrc]=bg
+    app_bg[:,isrc]= raw-f # in mJy units
 
     if do_wiggle:
         wapp_f[:,isrc]=wf
         wapp_df[:,isrc]=wdf
         wapp_flag[:,isrc]=wflag
         wapp_raw[:,isrc]=wraw
-        wapp_bg[:,isrc]=wbg
+        #wapp_bg[:,isrc]=wbg
+        wapp_bg[:,isrc]=wraw-wf
 
     
     pl.subplot(3,2,6)
@@ -240,32 +281,41 @@ for isrc in range(nsrc):
     pl.xscale("log")
     pl.yscale("log")
 
-    z=np.where(sourcename[isrc]==tj['col1'])[0]
-    if len(z)>1:
-        print("source name error")
-    if len(z)>0:
-        jf=tj[z[0]]['col17','col19','col21','col23','col25','col27','col29','col31','col33','col35','col37','col39','col41']
-        djf=tj[z[0]]['col18','col20','col22','col24','col26','col28','col30','col32','col34','col36','col38','col40','col42']
-        jf=[x for x in jf]
-        djf=[x for x in djf]        
-        # jimena apperture correction
-        jf=jf/np.array([1.94,2.31,2.15,2.00,2.17, 1.78,1.87,1.86,1.85, 2,2,2,2])
-        djf=djf/np.array([1.94,2.31,2.15,2.00,2.17, 1.78,1.87,1.86,1.85, 2,2,2,2])
-        #pl.plot(apphot_wave,jf,'x',label="Jimena")
-        pl.errorbar(apphot_wave,jf,yerr=djf,fmt='x',label="Jimena")
+    jf =[jtable[isrc][cc] for cc in jfcols]
+    djf=[jtable[isrc][cc] for cc in jdfcols]
 
-    z=np.where(int(sourcename[isrc][2:])==hstt['ID_PHANGS_CLUSTERS'])[0]
+    # jimena apperture correction
+    jf =jf /j_apcorr 
+    djf=djf/j_apcorr
+
+    z=np.where(jf>0)[0]    
+    pl.errorbar(apphot_wave[z],jf[z],yerr=djf[z],fmt='x',color='orange',label="Jimena")
+    z=np.where(jf<0)[0]
+    if len(z)>0:
+        pl.plot(apphot_wave[z],np.absolute(jf[z]),'v',color='orange')
+
+    jr_f[:,isrc]=jf
+    jr_df[:,isrc]=djf
+    jr_raw[:,isrc]= [jtable[isrc][cc] for cc in jfbcols]
+    jr_bg[:,isrc] = [jtable[isrc][cc] for cc in jfbgcols]
+
+
+    z=np.where(sourcename[isrc]==hsttable['ID_PHANGS_CLUSTERS'])[0]
     if len(z)>1:
         print("source name error")
     if len(z)>0:
-        hf=[hstt[z[0]][cc] for cc in hstfcols]
-        hdf=[hstt[z[0]][cc] for cc in hstdfcols]
+        hf=[hsttable[z[0]][cc] for cc in hstfcols]
+        hdf=[hsttable[z[0]][cc] for cc in hstdfcols]
         
         # jimena aperture correction?
-        hf=hf/np.array([1.94,2.31,2.15,2.00,2.17])
-        hdf=np.absolute(hdf)/np.array([1.94,2.31,2.15,2.00,2.17])
+        hf=hf/phangs_apcorr[0:5]
+        hdf=np.absolute(hdf)/phangs_apcorr[0:5]
 
         pl.errorbar(apphot_wave[0:5],hf,yerr=hdf,fmt='o',mfc='none',color='green',label="HST")
+        
+        cat_f[0:5,isrc]=hf
+        cat_df[0:5,isrc]=hdf
+
 
     pl.legend(loc="best",prop={"size":8})
     pl.xlabel("um")
@@ -286,6 +336,7 @@ for isrc in range(nsrc):
 import pickle
 pickle.dump( {"ra":ra,
               "dec":de,
+              "name":sourcename,
               "app_f":app_f,
               "app_df":app_df,
               "app_raw":app_raw,
@@ -293,7 +344,14 @@ pickle.dump( {"ra":ra,
               "app_bg":app_bg,
               "app_wave":apphot_wave,
               "app_files":apphot_file,
-              }, open( outdir+regname+".pkl", "wb" ) )
+              "filter":filter_name,
+              "jr_f":jr_f,
+              "jr_raw":jr_raw,
+              "jr_df":jr_df,
+              "jr_bg":jr_bg,
+              "cat_f":cat_f,
+              "cat_df":cat_df,
+              }, open( outdir+"/"+regname+".pkl", "wb" ) )
 
 
     

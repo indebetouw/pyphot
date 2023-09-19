@@ -683,9 +683,9 @@ class Region:
             dx=x-x0+offset[0]  # fractional pixel offsets
             dy=y-y0+offset[1]
             # grr pixel centers again - is this right?
-            #            dx=dx-0.5; dy=dy-0.5
+            #dx=dx-0.5; dy=dy-0.5
 
-            print(imshape,x,y,dx,dy)
+            #print(imshape,x,y,dx,dy)
             if imshape[0]>300:
                 pdb.set_trace()
             
@@ -763,40 +763,49 @@ class Region:
             cmap1._lut[:,-1] = pl.array([0,0.3,0,0,0])
             pl.imshow(mask>0,origin="lower",interpolation="nearest",cmap=cmap1)
 
-        from scipy import ndimage
-        from scipy.ndimage import measurements as m
+        import scipy.ndimage as nd
         nin=len(pl.where(mask==1)[0])
         nout=len(pl.where(mask==2)[0])
 
         floor=pl.nanmin(im.data)
         if floor<0: floor=0
-        raw=m.sum(im.data,mask,1)-floor*nin
+        floor=0 # 20230912 test
+        
+        raw=nd.sum(im.data,mask,1)-floor*nin
 
-        #bg=m.mean(im.data,mask,2)
-        #bgsig=m.standard_deviation(im.data,mask,2)
+        #bg=nd.mean(im.data,mask,2)
+        #bgsig=nd.standard_deviation(im.data,mask,2)
 
-#        from astropy.stats import sigma_clip
-#        clipped = sigma_clip(im.data,sig=3,iters=2)
+        from astropy.stats import sigma_clip
+        #clipped = sigma_clip(im.data,sigma=3,maxiters=2)
 #        # http://astropy.readthedocs.org/en/latest/api/astropy.stats.sigma_clip.html#astropy.stats.sigma_clip
-#        # TODO what we really want is to sigma-clip only the BG array/mask
-#        # because including the source will probably just be domimated by the
-#        # source...
-#        bg   =m.mean(              clipped,mask,2)-floor
-#        bgsig=m.standard_deviation(clipped,mask,2)
+        #bg   =nd.median(              clipped,mask,2)-floor
+        #bgsig=nd.standard_deviation(clipped,mask,2)
 
+
+        nsig=3
+        niter=5
         # sigma_clip doesn't handle nans
         from scipy import stats
         def mymode(x):
             return stats.mode(x,axis=None)[0][0]
+        def myscmed(x):
+            return np.median(sigma_clip(x,sigma=nsig,maxiters=niter))
 
-#        pdb.set_trace()
-#        xx=stats.mode(im.data,axis=None)
-#        print xx
+        # BG by mode
+        # bg = nd.labeled_comprehension(im.data,mask,2,mymode,"float",0)-floor
+        # BG by mean
+        # bg = nd.labeled_comprehension(im.data,mask,2,pl.mean,"float",0)
 
-        bg = ndimage.labeled_comprehension(im.data,mask,2,mymode,"float",0)-floor
-#        bg = ndimage.labeled_comprehension(im.data,mask,2,pl.mean,"float",0)
-        bgsig=m.standard_deviation(im.data,mask,2)
-        
+        # BG by median
+        bg = nd.labeled_comprehension(im.data,mask,2,myscmed,"float",0)-floor
+        bgsig=nd.standard_deviation(im.data,mask,2)
+
+        clipped= 0*im.data.copy()
+        #clipped[mask==2] = sigma_clip(im.data[mask==2],sigma=5,maxiters=5).filled(0)
+        #pl.imshow(im.data-clipped,alpha=im.data-clipped,origin="lower",interpolation="nearest",cmap="Reds")
+        clipped[mask==2] = im.data[mask==2]-sigma_clip(im.data[mask==2],sigma=nsig,maxiters=niter).filled(0)
+        pl.imshow(clipped,alpha=1.*np.int32(clipped>0),origin="lower",interpolation="nearest",cmap="Reds")
 
         # assume uncert dominated by BG level.
         # TODO add sqrt(cts in source) Poisson - need gain or explicit err/pix
@@ -1007,36 +1016,35 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
             pl.subplot(panel[0],panel[1],panel[2])
             im=hextract(imlist[j],xtents)[0]
             ## ROTATE
-            rotate=True
+            rotate=False
             if rotate:
                 from astropy import wcs
                 w=wcs.WCS(im.header)
-                from scipy.ndimage.interpolation import rotate
                 if w.wcs.has_crota():
                     t0=w.wcs.crota[1]
                 elif w.wcs.has_cd():
                     t0=pl.arctan2(w.wcs.cd[0,1],-w.wcs.cd[0,0])*180/pl.pi
                 else:
                     t0=0.
-                    print("WARN: assuming CROTA2=0")
+                    #print("WARN: assuming CROTA2=0")
                 theta=-1*t0
-                im.data=rotate(im.data,theta,reshape=False)
-                ct=pl.cos(pl.pi*theta/180)
-                st=pl.sin(pl.pi*theta/180)
-                if w.wcs.has_crota():
-                    w.wcs.crota[1]=w.wcs.crota[1]+theta
-                    im.header['CROTA2']=w.wcs.crota[1]
-                    print("rotating crota by "+str(theta))
-                elif w.wcs.has_cd():
-                    w.wcs.cd=pl.matrix(w.wcs.cd)*pl.matrix([[ct,-st],[st,ct]])
-                    im.header['CD1_1']=w.wcs.cd[0,0]
-                    im.header['CD1_2']=w.wcs.cd[0,1]
-                    im.header['CD2_1']=w.wcs.cd[1,0]
-                    im.header['CD2_2']=w.wcs.cd[1,1]
-                    print("rotating cd    by "+str(theta))
-                    #else:
-                    #    print("WARN: not rotating CD")
-
+                if np.absolute(theta)>1e-10:
+                    im.data=nd.rotate(im.data,theta,reshape=False)
+                    ct=pl.cos(pl.pi*theta/180)
+                    st=pl.sin(pl.pi*theta/180)
+                    if w.wcs.has_crota():
+                        w.wcs.crota[1]=w.wcs.crota[1]+theta
+                        im.header['CROTA2']=w.wcs.crota[1]
+                        print("rotating crota by "+str(theta))
+                    elif w.wcs.has_cd():
+                        w.wcs.cd=pl.matrix(w.wcs.cd)*pl.matrix([[ct,-st],[st,ct]])
+                        im.header['CD1_1']=w.wcs.cd[0,0]
+                        im.header['CD1_2']=w.wcs.cd[0,1]
+                        im.header['CD2_1']=w.wcs.cd[1,0]
+                        im.header['CD2_2']=w.wcs.cd[1,1]
+                        print("rotating cd    by "+str(theta))
+                        #else:
+                        #    print("WARN: not rotating CD")
                         
                     #pdb.set_trace()
 
