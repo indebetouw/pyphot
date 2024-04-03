@@ -618,8 +618,8 @@ class Region:
         if self.type=="circle":
             diam=2*ca[2]
         elif self.type=="polygon":                
-            dx=[np.min(ca[0,:]),np.max(ca[0,:])]
-            dy=[np.min(ca[1,:]),np.max(ca[1,:])]
+            dx=[np.min(ca[:,0]),np.max(ca[:,0])]
+            dy=[np.min(ca[:,1]),np.max(ca[:,1])]
             ddx=dx[1]-dx[0]
             ddy=dy[1]-dy[0]
             diam=max(ddx,ddy)
@@ -638,15 +638,15 @@ class Region:
             xra=c1[0] + (dr*buffr+ c1[2])*np.array([-1,1])
             yra=c1[1] + (dr*buffr+ c1[2])*np.array([-1,1])
         elif self.type=="polygon":                
-            dx=[np.min(ca[0,:]),np.max(ca[0,:])]
-            dy=[np.min(ca[1,:]),np.max(ca[1,:])]
+            dx=[np.min(ca[:,0]),np.max(ca[:,0])]
+            dy=[np.min(ca[:,1]),np.max(ca[:,1])]
             ctr=[np.mean(dx),np.mean(dy)]
             dx=dx[1]-dx[0]
             dy=dy[1]-dy[0]
             dr=0.5*np.max([dx,dy])
-            xra = np.array([np.min(c1[0,:]),np.max(c1[0,:])]) \
+            xra = np.array([np.min(c1[:,0]),np.max(c1[:,0])]) \
                 +dr*buffr*np.array([-1,1])
-            yra = np.array([np.min(c1[1,:]),np.max(c1[1,:])]) \
+            yra = np.array([np.min(c1[:,1]),np.max(c1[:,1])]) \
                 +dr*buffr*np.array([-1,1])
 
         xra[0]=np.floor(xra[0])+1
@@ -851,12 +851,26 @@ class Region:
         """
         h=im.header
         bunit=h.get("bunit")
-        bunit=bunit.strip().upper()
         if bunit==None:
             bunit=h.get("qtty____")
-            if bunit==None:
-                return None
-                # raise Exception("can't find BUNIT or QTTY____ in your image")
+
+        if bunit==None:
+            if "2MASS" in h.get("ORIGIN"):
+                bunit="CTS"
+                if "j" in h.get("filter"):
+                    f0=1594
+                elif "h" in h.get("filter"):
+                    f0=1024
+                elif "k" in h.get("filter"):
+                    f0=666.7
+                else:
+                    f0=0
+                return(f0*10.**(float(h.get("magzp"))/(-2.5)))
+            
+        if bunit==None:
+            raise Exception("can't find BUNIT or QTTY____ in your image")
+
+        bunit=bunit.strip().upper()
         # pixel area in sr
         pixsr=self.pixarea(im) * (np.pi/180)**2
 
@@ -992,7 +1006,7 @@ def loadims(imfiles):
         imlist.append(im[i])
     return imlist
         
-def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",offsetfrac=0,buffr=1.):
+def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",offsetfrac=0,buffr=1.,scale="linear"):
     """
     give me a region and an imlist and tell me whether to plot cutouts
     """
@@ -1049,8 +1063,6 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
                         #else:
                         #    print("WARN: not rotating CD")
                         
-                    #pdb.set_trace()
-
             # ugh need minmax of aperture region...
             # estimate as inner 1/2 for now
             s=im.shape
@@ -1058,17 +1070,12 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
             if len(z[0])<=0:
                 print(z)
 
-            z=np.where(np.isnan(im.data))
-            if len(z[0])>0:
-                z=np.where(np.isnan(im.data)==False)
-                std=im.data[z[0],z[1]].std()
-            else:
-                std=im.data.std()
-            rg=np.median(im.data)+np.array([-0.5,5])*std
+            std=np.nanstd(im.data)
+            rg=np.nanmedian(im.data)+np.array([-0.5,5])*std
             # marta wants them less saturated
             # rg[1]=np.nanmax(im.data)
 
-            if plot: 
+            if plot:
                 if rg[0]<0: rg[0]=0
                 if rg[1]<rg[0]:
                      rg=[np.nanmin(im.data),np.nanmax(im.data)]
@@ -1093,7 +1100,7 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
                 if showmask=="both":
                     panel[2]=panel[2]+1
                     pl.subplot(panel[0],panel[1],panel[2])
-                    rg=np.median(im.data)+np.array([-0.5,5])*std
+                    rg=np.nanmedian(im.data)+np.array([-0.5,5])*std
                     if rg[0]<0: rg[0]=0
                     if rg[1]<=rg[0]:
                         rg=[np.nanmin(im.data),np.nanmax(im.data)]
