@@ -759,6 +759,8 @@ class Region:
         # do rms of the bg correctly so we can't use their stuff yet.
 
         mask=self.setmask(im,offset=offset)
+        z=np.where(np.isnan(im.data))
+        mask[z]=0
 
         if showmask:
             cmap1=pl.matplotlib.colors.LinearSegmentedColormap.from_list('my_cmap',["black","blue"],2)
@@ -1021,12 +1023,13 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
         im=imlist[j]
         # if plotting, need to make image cutouts; even if not, this tells
         # us if the source is off the edge
-        xtents=r.imextents(imlist[j],buffr=buffr)
+        xtents=r.imextents(im,buffr=buffr)
         minsize=5
         if (xtents[3]-xtents[1])<minsize or (xtents[2]-xtents[0])<minsize:
             raw0,f0,df0=0,0,0
             print("phot region too small - %f,%f less than %d pixels" % ((xtents[3]-xtents[1]),(xtents[2]-xtents[0]),minsize))
             print(xtents,r.imcoords(im,reg="bg1"))
+            pdb.set_trace()
         else:
             regdiameter=0.5*( (xtents[3]-xtents[1]) + (xtents[2]-xtents[0]) )
             
@@ -1070,23 +1073,27 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
             if len(z[0])<=0:
                 print(z)
 
-            std=np.nanstd(im.data)
-            rg=np.nanmedian(im.data)+np.array([-0.5,5])*std
+            idata=im.data
+            if scale=="log":
+                idata=np.log10(idata)
+
+            std=np.nanstd(idata)
+            rg=np.nanmedian(idata)+np.array([-0.5,5])*std
             # marta wants them less saturated
             # rg[1]=np.nanmax(im.data)
 
             if plot:
                 if rg[0]<0: rg[0]=0
                 if rg[1]<rg[0]:
-                     rg=[np.nanmin(im.data),np.nanmax(im.data)]
+                     rg=[np.nanmin(idata),np.nanmax(idata)]
                 if showmask==False or showmask=="both": # show the jet one 
-                    pl.imshow(im.data,origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1])
+                    pl.imshow(idata,origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1])
                 elif showmask==True: # only show the mask
-                    pl.imshow(im.data,origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1],cmap="YlGn")
+                    pl.imshow(idata,origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1],cmap="YlGn")
                 ax=pl.gca()
                 ax.axes.get_xaxis().set_visible(False)
                 ax.axes.get_yaxis().set_visible(False)
-                if names:
+                if type(names)!=type(None):
                     pl.text(0.05, 0.99, names[j], horizontalalignment='left',
                             verticalalignment='top',
                             transform=ax.transAxes,
@@ -1100,15 +1107,15 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
                 if showmask=="both":
                     panel[2]=panel[2]+1
                     pl.subplot(panel[0],panel[1],panel[2])
-                    rg=np.nanmedian(im.data)+np.array([-0.5,5])*std
+                    rg=np.nanmedian(idata)+np.array([-0.5,5])*std
                     if rg[0]<0: rg[0]=0
                     if rg[1]<=rg[0]:
-                        rg=[np.nanmin(im.data),np.nanmax(im.data)]
-                    pl.imshow(im.data,origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1],cmap="YlGn")
+                        rg=[np.nanmin(idata),np.nanmax(idata)]
+                    pl.imshow(idata,origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1],cmap="YlGn")
                     ax=pl.gca()
                     ax.axes.get_xaxis().set_visible(False)
                     ax.axes.get_yaxis().set_visible(False)
-                    if names:
+                    if type(names)!=type(None):
                         pl.text(0.05, 0.99, names[j], horizontalalignment='left',
                                 verticalalignment='top',
                                 transform=ax.transAxes,
@@ -1119,7 +1126,7 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
 
             if debug:
 #                r.debug=True
-                if names:
+                if type(names)!=type(None):
                     print(names[j])
 
             if offsetfrac>0:
