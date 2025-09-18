@@ -452,6 +452,27 @@ class Region:
         self.setbgcoords()
 
     #-------------------------------------------------------
+    def setellipse(self,args):
+        """
+        args array = [ra,dec,bmaj,bmin,pa in decimal degrees]
+        """
+        self.type="polygon"
+        pa_rad=args[4]*np.pi/180 # to radians
+        n=21
+        t=np.arange(n)*2*np.pi/(n-1)
+        x0=args[2]*np.cos(t)+args[3]*np.sin(t)
+        y0=args[3]*np.cos(t)-args[2]*np.sin(t)
+        # rotate
+        y=np.cos(pa_rad)*y0 - np.sin(pa_rad)*x0
+        x=np.cos(pa_rad)*x0 + np.sin(pa_rad)*y0
+        # account for sky coordinates in ra - scale and recenter:
+        x=x/np.cos(args[1]*np.pi/180) + args[0]
+        y=y + args[1]
+
+        self.coords=np.array([x,y]).T
+        self.setbgcoords()
+
+    #-------------------------------------------------------
     def setpoly(self,coordarr):
         """
         ra1,de1,ra2,de2... in decimal degrees
@@ -593,7 +614,7 @@ class Region:
         from astropy import wcs
         w=wcs.WCS(im.header)
         while w.naxis>2:
-            w.dropaxis(-1) # fragile - assumes spectral and stokes are last
+            w=w.dropaxis(-1) # fragile - assumes spectral and stokes are last
         # use origin=0 i.e. NOT FITS convention, but pl.imshow sets origin
         # to 0,0 so do that here so we can overplot on pl.imshow axes
         origin=0
@@ -1018,7 +1039,7 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
     give me a region and an imlist and tell me whether to plot cutouts
     """
     nim=len(imlist)
-    # TODO alg for how many subpanels.
+    # TODO algorithm for how many subpanels.
     if panel==None: panel=[5,4,1] # for vertical page
     f=[]
     df=[]
