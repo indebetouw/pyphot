@@ -1,5 +1,5 @@
-import matplotlib.pylab as pl
-import astropy.io.fits as pyfits
+import matplotlib.pyplot as pl
+from astropy.io import fits
 import pdb
 import numpy as np
 
@@ -57,9 +57,9 @@ def hextract(hin,crds,outfile=None):
 #    print ctr,w.wcs_pix2world([[0.5*(x1-x0),0.5*(y1-y0)]],1)[0]
     
     datout=hin.data[y0:y1,x0:x1].copy()
-    hduout=pyfits.PrimaryHDU(data=datout,header=hdrout)
+    hduout=fits.PrimaryHDU(data=datout,header=hdrout)
     if outfile: hduout.writeto(outfile)
-    return pyfits.HDUList([hduout])
+    return fits.HDUList([hduout])
 
 
 #===========================================================================
@@ -501,7 +501,7 @@ class Region:
             raise Exception("region type=None - has it been set?")
         if self.type=="circle":
             if len(self.coords)!=3:
-                raise Exception("region coords should be ctr_ra, ctr_dec, rad_arcsec - the coord array has unexpected length %d" % len(self.coords))
+                raise Exception("region coords should be ctr_ra, ctr_dec, rad_deg - the coord array has unexpected length %d" % len(self.coords))
             self.bg0coords=np.array(self.coords)
             self.bg1coords=np.array(self.coords)
             # set larger radii for annulus
@@ -592,13 +592,15 @@ class Region:
 
         from astropy import wcs
         w=wcs.WCS(im.header)
+        while w.naxis>2:
+            w.dropaxis(-1) # fragile - assumes spectral and stokes are last
         # use origin=0 i.e. NOT FITS convention, but pl.imshow sets origin
         # to 0,0 so do that here so we can overplot on pl.imshow axes
         origin=0
 
         if self.type=="circle":
             ctr=w.wcs_world2pix([c[0:2]],origin)[0]
-            # I couldn't find a simple way to convert from arcsec to pix
+            # I couldn't find a simple way to convert from deg to pix
             # probably because it only is well-defined if the pixels are square
             # and non-distorted.  so assume that for now:
             ctr2=w.wcs_world2pix([c[0:2]+np.array([0,c[2]])],origin)[0]
@@ -870,7 +872,10 @@ class Region:
                 return(f0*10.**(float(h.get("magzp"))/(-2.5)))
             
         if bunit==None:
-            raise Exception("can't find BUNIT or QTTY____ in your image")
+            #raise Exception("can't find BUNIT or QTTY____ in your image")
+            print("ERROR: can't find BUNIT or QTTY____ in your image")
+            bunit="Jy/pixel"
+            
 
         bunit=bunit.strip().upper()
         # pixel area in sr
@@ -961,7 +966,7 @@ class Region:
         if not os.path.exists(datfile): raise Exception("Need test file "+datfile)
         
         # need an image
-        f=pyfits.open(datfile)
+        f=fits.open(datfile)
         # if hdu 0 has no data, go to hext hdu - if wcs is in hdu0 and data
         # in hdu1 then we'll be in trouble.
         i=0
@@ -995,7 +1000,7 @@ def loadims(imfiles):
     for f in imfiles:
         print(f)
         if not os.path.exists(f): raise Exception("Need file "+f)
-        im=pyfits.open(f)
+        im=fits.open(f)
         # if hdu 0 has no data, go to hext hdu - if wcs is in hdu0 and data
         # in hdu1 then we'll be in trouble.
         i=0
