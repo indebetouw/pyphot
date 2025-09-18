@@ -1,5 +1,6 @@
 import matplotlib.pyplot as pl
 from astropy.io import fits
+from astropy.wcs import WCS
 import pdb
 import numpy as np
 
@@ -12,7 +13,7 @@ import numpy as np
 
 # TODO use ginsberg fits_utils instead of this:?
 #def hextract(hin,x0,x1,y0,y1,outfile=None):
-def hextract(hin,crds,outfile=None):
+def hextract(im,crds,outfile=None):
     """
     works in image coordinates; takes HDU, returns HDU
     """
@@ -20,7 +21,7 @@ def hextract(hin,crds,outfile=None):
     y0=crds[1]
     x1=crds[2]
     y1=crds[3]
-    imshape=hin.shape
+    imshape=im['data'].shape
     # check and sanitize inputs
     if len(imshape)>2: raise Exception("can't extract subim from >2D image")
     if x0<0 or y0<0:
@@ -37,29 +38,26 @@ def hextract(hin,crds,outfile=None):
         print("trc (%f,%f) is out of bounds, correcting to (%f,%f)" % (x10,y10,x1,y1))
         
     # translate cdelt to center
-    from astropy import wcs
-    w=wcs.WCS(hin.header)
     c=[0.5*(x0+x1),0.5*(y0+y1)]
     # world coords of ctr of the cutout
-    ctr=w.wcs_pix2world([c[0:2]],1)[0]
+    ctr=im['wcs'].wcs_pix2world([c[0:2]],1)[0]
 
-    hdrout=hin.header.copy(strip=True)
-    # this was the old, just translate crpix:
-#    hdrout['crpix1']=hdrout['crpix1']-x0
-#    hdrout['crpix2']=hdrout['crpix2']-y0
-    # better:
+    hdrout=im['header'].copy(strip=True)
     hdrout['crpix1']=0.5*(x1-x0)
     hdrout['crpix2']=0.5*(y1-y0)
     hdrout['crval1']=ctr[0]
     hdrout['crval2']=ctr[1]
-    # check
-    w=wcs.WCS(hdrout)
-#    print ctr,w.wcs_pix2world([[0.5*(x1-x0),0.5*(y1-y0)]],1)[0]
+    # wcsout=WCS(hdrout)
+    wcsout=im['wcs'].deepcopy()
+    wcsout.wcs.crval=ctr
+    wcsout.wcs.crpix=[0.5*(x1-x0),0.5*(y1-y0)]
+    # check these should be the same
+    # print ctr,wnew.wcs_pix2world([[0.5*(x1-x0),0.5*(y1-y0)]],1)[0]
     
-    datout=hin.data[y0:y1,x0:x1].copy()
+    datout=copy(im['data'][y0:y1,x0:x1])
     hduout=fits.PrimaryHDU(data=datout,header=hdrout)
     if outfile: hduout.writeto(outfile)
-    return fits.HDUList([hduout])
+    return {"file":im['file']+"_hextract","data":datout, "header":hdrout, "wcs":wcsout, "photfactor":im['photfactor']} 
 
 
 #===========================================================================
@@ -583,15 +581,13 @@ class Region:
                 pl.plot(ci[0]+r*ct, ci[1]+r*st)
 
             # indicate north:  XXX TODO make general
-            from astropy import wcs
-            w=wcs.WCS(im.header)
             # use origin=0 i.e. NOT FITS convention, but pl.imshow sets origin
             # to 0,0 so do that here so we can overplot on pl.imshow axes
             origin=0
             c=self.bg1coords # only works below for circle
-            ctr=w.wcs_world2pix([c[0:2]],origin)[0]
+            ctr=im['wcs'].wcs_world2pix([c[0:2]],origin)[0]
             # north
-            ctr2=w.wcs_world2pix([c[0:2]+np.array([c[2],0])],origin)[0]
+            ctr2=im['wcs'].wcs_world2pix([c[0:2]+np.array([c[2],0])],origin)[0]
             pl.plot([ctr[0],ctr2[0]],[ctr[1],ctr2[1]])
 
 
@@ -599,7 +595,7 @@ class Region:
     #-------------------------------------------------------
     def imcoords(self,im,reg="ap"):
         """
-        given an image, return the region coords in image coordinates (pixels)
+        given an image(dict), return the region coords in image coordinates (pixels)
         can optionally specify reg=["ap","bg0","bg1"] (default=ap)
         for the aperture, the inner background and the outer background
         """
@@ -611,24 +607,17 @@ class Region:
             c=self.bg1coords
         else: raise Exception("unknown input reg=%s" % reg)
 
-        from astropy import wcs
-        w=wcs.WCS(im.header)
-        while w.naxis>2:
-            w=w.dropaxis(-1) # fragile - assumes spectral and stokes are last
-        # use origin=0 i.e. NOT FITS convention, but pl.imshow sets origin
-        # to 0,0 so do that here so we can overplot on pl.imshow axes
         origin=0
-
         if self.type=="circle":
-            ctr=w.wcs_world2pix([c[0:2]],origin)[0]
+            ctr=im['wcs'].wcs_world2pix([c[0:2]],origin)[0]
             # I couldn't find a simple way to convert from deg to pix
             # probably because it only is well-defined if the pixels are square
             # and non-distorted.  so assume that for now:
-            ctr2=w.wcs_world2pix([c[0:2]+np.array([0,c[2]])],origin)[0]
+            ctr2=im['wcs'].wcs_world2pix([c[0:2]+np.array([0,c[2]])],origin)[0]
             rad=ctr2[1]-ctr[1] 
             return ctr[0],ctr[1],rad # should all be in pix now
         elif self.type=="polygon":
-            return w.wcs_world2pix(c,origin)
+            return im['wcs'].wcs_world2pix(c,origin)
         else: raise Exception("unknown region type %s" % self.type)
                 
 
@@ -679,7 +668,7 @@ class Region:
             
         if xra[0]<0: xra[0]=0
         if yra[0]<0: yra[0]=0
-        s=im.shape-np.array([1,1]) # remember, transposed y,x
+        s=im['data'].shape-np.array([1,1]) # remember, transposed y,x
         if xra[1]>s[1]: xra[1]=s[1]
         if yra[1]>s[0]: yra[1]=s[0]
 
@@ -692,7 +681,7 @@ class Region:
     #-------------------------------------------------------
     def setmask(self,im,offset=[0,0]):
         """
-        input an image (for now an HDU) and set self.mask to 
+        input an image dict and set self.mask to 
         an array the size of the image with the phot region =1
           and expanded background annulus =2
         for now we also create a mask the size of the image, so I recommend
@@ -700,7 +689,7 @@ class Region:
         this method will trim the polyon to fit in the image
         offset is extra offset in pixels 
         """
-        imshape=im.shape
+        imshape=im['data'].shape
         mask=np.zeros(imshape)
         
         if self.type=="circle":
@@ -773,16 +762,15 @@ class Region:
                 rs.append(self.phot(im,showmask=False,offset=np.array([i,j])*offsetpix))
         rs=np.array(rs)
         return np.nanmean(rs[:,0]), np.nanmean(rs[:,1]), np.nanmean(rs[:,2]), np.nanmax(rs[:,3])+np.nanstd(rs[:,2])
-
     
     #-------------------------------------------------------
     def phot(self,im,showmask=True,offset=[0,0]):
         # TODO if we switch to astropy.photometry then we can have that 
-        # do the work with subpixels properly, but for now they don't 
+        # do the work with subpiXels properly, but for now they don't 
         # do rms of the bg correctly so we can't use their stuff yet.
 
         mask=self.setmask(im,offset=offset)
-        z=np.where(np.isnan(im.data))
+        z=np.where(np.isnan(im['data']))
         mask[z]=0
 
         if showmask:
@@ -795,11 +783,11 @@ class Region:
         nin=len(np.where(mask==1)[0])
         nout=len(np.where(mask==2)[0])
 
-        floor=np.nanmin(im.data)
+        floor=np.nanmin(im['data'])
         if floor<0: floor=0
         floor=0 # 20230912 test
         
-        raw=nd.sum(im.data,mask,1)-floor*nin
+        raw=nd.sum(im['data'],mask,1)-floor*nin
 
         #bg=nd.mean(im.data,mask,2)
         #bgsig=nd.standard_deviation(im.data,mask,2)
@@ -826,13 +814,13 @@ class Region:
         # bg = nd.labeled_comprehension(im.data,mask,2,np.mean,"float",0)
 
         # BG by median
-        bg = nd.labeled_comprehension(im.data,mask,2,myscmed,"float",0)-floor
-        bgsig=nd.standard_deviation(im.data,mask,2)
+        bg = nd.labeled_comprehension(im['data'],mask,2,myscmed,"float",0)-floor
+        bgsig=nd.standard_deviation(im['data'],mask,2)
 
-        clipped= 0*im.data.copy()
+        clipped= 0*im['data'].copy()
         #clipped[mask==2] = sigma_clip(im.data[mask==2],sigma=5,maxiters=5).filled(0)
         #pl.imshow(im.data-clipped,alpha=im.data-clipped,origin="lower",interpolation="nearest",cmap="Reds")
-        clipped[mask==2] = im.data[mask==2]-sigma_clip(im.data[mask==2],sigma=nsig,maxiters=niter).filled(0)
+        clipped[mask==2] = im['data'][mask==2]-sigma_clip(im['data'][mask==2],sigma=nsig,maxiters=niter).filled(0)
         pl.imshow(clipped,alpha=1.*np.int32(clipped>0),origin="lower",interpolation="nearest",cmap="Reds")
 
         # assume uncert dominated by BG level.
@@ -842,7 +830,7 @@ class Region:
         results=raw, bg, raw-bg*nin, uncert
 
         
-        f=self.photfactor(im)
+        f=im['photfactor']
         if f:
             if self.debug: print("phot factor = ",f)
             results=np.array(results)*f
@@ -861,69 +849,7 @@ class Region:
         """
         area of pixel in deg2; this doesn't belong in the Region ...       
         """
-        from astropy import wcs
-        mywcs=wcs.WCS(im.header)
-        # TODO check that get_pc() returns unity matrix in CDELT header
-        # this works for a CD matrix header AFAICT
-        cd=mywcs.wcs.get_pc()*mywcs.wcs.get_cdelt()
-        return -np.linalg.det(cd)
-
-    #-------------------------------------------------------
-    def photfactor(self,im):
-        """
-        attempt to determine the multiplicative factor from pixel values to Jy
-        this doesn't belong in the Region ...
-        """
-        h=im.header
-        bunit=h.get("bunit")
-        if bunit==None:
-            bunit=h.get("qtty____")
-
-        if bunit==None:
-            if "2MASS" in h.get("ORIGIN"):
-                bunit="CTS"
-                if "j" in h.get("filter"):
-                    f0=1594
-                elif "h" in h.get("filter"):
-                    f0=1024
-                elif "k" in h.get("filter"):
-                    f0=666.7
-                else:
-                    f0=0
-                return(f0*10.**(float(h.get("magzp"))/(-2.5)))
-            
-        if bunit==None:
-            #raise Exception("can't find BUNIT or QTTY____ in your image")
-            print("ERROR: can't find BUNIT or QTTY____ in your image")
-            bunit="Jy/pixel"
-            
-
-        bunit=bunit.strip().upper()
-        # pixel area in sr
-        pixsr=self.pixarea(im) * (np.pi/180)**2
-
-        if bunit=="MJY/SR":
-            return 1.e6 * pixsr
-        elif bunit=="JY/PIXEL":
-            return 1.
-        elif bunit=="JY/BEAM":
-            # SPIRE only for the moment
-            desc=h.get("desc")
-            if desc=="PSW map":
-                return 112.197 * 1.e6 * pixsr
-            elif desc=="PMW map":
-                return 61.415 * 1.e6 * pixsr
-            elif desc=="PLW map":
-                return 24.336 * 1.e6 * pixsr
-            else:
-                raise Exception("can't figure out beam area for Jy/beam bunit")
-        elif bunit=="2MASS":
-            return 7.e-06*4 # for 4x pixelization from 1s-2s 
-        elif bunit=="IRSF":
-            return 3.98e5 * pixsr
-        else:
-            #return None
-            raise Exception("don't understand your bunit")
+        return im['wcs'].proj_plane_pixel_area().to("deg2").value
 
 
     #-------------------------------------------------------        
@@ -957,10 +883,9 @@ class Region:
         
             pl.subplot(224)
             subim=hextract(im,[int(xlim[0]),int(ylim[0]),int(xlim[1]),int(ylim[1])])
-            im=subim[0]
-            s=im.shape
+            s=subim.shape
             # don't mess with "extent" it screws up where the pixel centers are
-            pl.imshow(im.data,origin="lower",interpolation="nearest")
+            pl.imshow(sumim['data'],origin="lower",interpolation="nearest")
             pl.xlim([0,s[1]])
             pl.ylim([0,s[0]])
             self.plotimx(im)
@@ -1013,25 +938,95 @@ class Region:
 
 
 #===========================================================================
-# TODO some kind of ImList class that has band and wave info?
+# TODO ImList class that has band and wave info?
+
+
+#-------------------------------------------------------
+def photfactor(w,h):
+    """
+    attempt to determine the multiplicative factor from pixel values to Jy
+    """
+    bunit=h.get("bunit")
+    if bunit==None:
+        bunit=h.get("qtty____")
+
+    if bunit==None:
+        if "2MASS" in h.get("ORIGIN"):
+            bunit="CTS"
+            if "j" in h.get("filter"):
+                f0=1594
+            elif "h" in h.get("filter"):
+                f0=1024
+            elif "k" in h.get("filter"):
+                f0=666.7
+            else:
+                f0=0
+            return(f0*10.**(float(h.get("magzp"))/(-2.5)))
+        
+    if bunit==None:
+        #raise Exception("can't find BUNIT or QTTY____ in your image")
+        print("ERROR: can't find BUNIT or QTTY____ in your image")
+        bunit="Jy/pixel"
+        
+
+    bunit=bunit.strip().upper()
+    # pixel area in sr
+    pixsr=irwcs.proj_plane_pixel_area().to("sr").value
+
+    if bunit=="MJY/SR":
+        return 1.e6 * pixsr
+    elif bunit=="JY/PIXEL":
+        return 1.
+    elif bunit=="JY/BEAM":
+        # SPIRE only for the moment
+        desc=h.get("desc")
+        if desc=="PSW map":
+            return 112.197 * 1.e6 * pixsr
+        elif desc=="PMW map":
+            return 61.415 * 1.e6 * pixsr
+        elif desc=="PLW map":
+            return 24.336 * 1.e6 * pixsr
+        else:
+            try:
+                return h['bmaj']*h['bmin']*(np.pi/180)**2 *pixsr
+            except:
+                raise Exception("can't figure out beam area for Jy/beam bunit")
+    elif bunit=="2MASS":
+        return 7.e-06*4 # for 4x pixelization from 1s-2s 
+    elif bunit=="IRSF":
+        return 3.98e5 * pixsr
+    else:
+        #return None
+        raise Exception("don't understand your bunit")
+
+
 
 def loadims(imfiles):
     import os.path
     imlist=[]
     for f in imfiles:
         print(f)
+        im_entry={"file":"","data":0,"header":"","wcs":None,"photfactor":np.nan}
         if not os.path.exists(f): raise Exception("Need file "+f)
-        im=fits.open(f)
+        hdu=fits.open(f)
         # if hdu 0 has no data, go to hext hdu - if wcs is in hdu0 and data
         # in hdu1 then we'll be in trouble.
         i=0
-        if len(im)>1: i=1 # some issues with multi-extension - the first is None
-        # if im[i].data==None: i=i+1
-        while len(im[i].data)<1: i=i+1
-#        z=np.where(np.isnan(im[i].data))
-#        pdb.set_trace()
-#        im[i].data[z[0]]=0.
-        imlist.append(im[i])
+        if len(hdu)>1: i=1 # some issues with multi-extension - the first is None
+        while len(hdu[i].data)<1: i=i+1
+        w=WCS(hdu[i].header)
+        axlist=w.get_axis_types()
+        while w.naxis>2:
+            if axlist[-1]['coordinate_type']!="celestial":
+                w=w.dropaxis(-1)
+                axlist.pop()
+                hdu[i].data=hdu[i].data[0]
+        im_entry['file']=f
+        im_entry["data"]=hdu[i].data
+        im_entry["header"]=hdu[i].header
+        im_entry["wcs"]=w
+        im_entry["photfactor"]=photfactor(w,hdu[i].header)
+        imlist.append(im_entry)
     return imlist
         
 def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",offsetfrac=0,buffr=1.,scale="linear"):
@@ -1046,10 +1041,9 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
     bg=[]
     raw=[]
     for j in range(nim):  
-        im=imlist[j]
         # if plotting, need to make image cutouts; even if not, this tells
         # us if the source is off the edge
-        xtents=r.imextents(im,buffr=buffr)
+        xtents=r.imextents(imlist[j],buffr=buffr)
         minsize=5
         if (xtents[3]-xtents[1])<minsize or (xtents[2]-xtents[0])<minsize:
             raw0,f0,df0=0,0,0
@@ -1059,63 +1053,61 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
         else:
             regdiameter=0.5*( (xtents[3]-xtents[1]) + (xtents[2]-xtents[0]) )
             
-            pl.subplot(panel[0],panel[1],panel[2])
-            im=hextract(imlist[j],xtents)[0]
+            pl.subplot(*panel)
+            
+            subim=hextract(imlist[j],xtents)
             ## ROTATE
             rotate=False
             if rotate:
-                from astropy import wcs
-                w=wcs.WCS(im.header)
-                if w.wcs.has_crota():
-                    t0=w.wcs.crota[1]
-                elif w.wcs.has_cd():
-                    t0=np.arctan2(w.wcs.cd[0,1],-w.wcs.cd[0,0])*180/np.pi
+                if subim['wcs'].has_crota():
+                    t0=subim['wcs'].crota[1]
+                elif subim['wcs'].has_cd():
+                    t0=np.arctan2(subim['wcs'].cd[0,1],-subim['wcs'].cd[0,0])*180/np.pi
                 else:
                     t0=0.
                     #print("WARN: assuming CROTA2=0")
                 theta=-1*t0
                 if np.absolute(theta)>1e-10:
-                    im.data=nd.rotate(im.data,theta,reshape=False)
+                    subim['data']=nd.rotate(subim['data'],theta,reshape=False)
                     ct=np.cos(np.pi*theta/180)
                     st=np.sin(np.pi*theta/180)
-                    if w.wcs.has_crota():
-                        w.wcs.crota[1]=w.wcs.crota[1]+theta
-                        im.header['CROTA2']=w.wcs.crota[1]
+                    if subim['wcs'].has_crota():
+                        subim['wcs'].crota[1]=subim['wcs'].crota[1]+theta
+                        subim['header']['CROTA2']=subim['wcs'].crota[1]
                         print("rotating crota by "+str(theta))
-                    elif w.wcs.has_cd():
-                        w.wcs.cd=np.matrix(w.wcs.cd)*np.matrix([[ct,-st],[st,ct]])
-                        im.header['CD1_1']=w.wcs.cd[0,0]
-                        im.header['CD1_2']=w.wcs.cd[0,1]
-                        im.header['CD2_1']=w.wcs.cd[1,0]
-                        im.header['CD2_2']=w.wcs.cd[1,1]
+                    elif subim['wcs'].has_cd():
+                        subim['wcs'].cd=np.matrix(subim['wcs'].cd)*np.matrix([[ct,-st],[st,ct]])
+                        subim['header']['CD1_1']=subim['wcs'].cd[0,0]
+                        subim['header']['CD1_2']=subim['wcs'].cd[0,1]
+                        subim['header']['CD2_1']=subim['wcs'].cd[1,0]
+                        subim['header']['CD2_2']=subim['wcs'].cd[1,1]
                         print("rotating cd    by "+str(theta))
                         #else:
                         #    print("WARN: not rotating CD")
                         
             # ugh need minmax of aperture region...
             # estimate as inner 1/2 for now
-            s=im.shape
-            z=im.data[int(s[0]*0.25):int(s[0]*0.75),int(s[1]*0.25):int(s[1]*0.75)]
+            s=subim['data'].shape
+            z=subim['data'][int(s[0]*0.25):int(s[0]*0.75),int(s[1]*0.25):int(s[1]*0.75)]
             if len(z[0])<=0:
                 print(z)
 
-            idata=im.data
             if scale=="log":
-                idata=np.log10(idata)
+                subim['data']=np.log10(subim['data'])
 
-            std=np.nanstd(idata)
-            rg=np.nanmedian(idata)+np.array([-0.5,5])*std
+            std=np.nanstd(subim['data'])
+            rg=np.nanmedian(subim['data'])+np.array([-0.5,5])*std
             # marta wants them less saturated
-            # rg[1]=np.nanmax(im.data)
+            # rg[1]=np.nanmax(subim.data)
 
             if plot:
                 if rg[0]<0: rg[0]=0
                 if rg[1]<rg[0]:
-                     rg=[np.nanmin(idata),np.nanmax(idata)]
+                     rg=[np.nanmin(subim['data']),np.nanmax(subim['data'])]
                 if showmask==False or showmask=="both": # show the jet one 
-                    pl.imshow(idata,origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1])
+                    pl.imshow(subim['data'],origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1])
                 elif showmask==True: # only show the mask
-                    pl.imshow(idata,origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1],cmap="YlGn")
+                    pl.imshow(subim['data'],origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1],cmap="YlGn")
                 ax=pl.gca()
                 ax.axes.get_xaxis().set_visible(False)
                 ax.axes.get_yaxis().set_visible(False)
@@ -1128,16 +1120,16 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
                 pl.xlim([-0.5,s[1]-0.5])
                 pl.ylim([-0.5,s[0]-0.5])
                 if showmask==False:
-                    r.plotimx(im) # overplot the apertures
+                    r.plotimx(subim) # overplot the apertures
 
                 if showmask=="both":
                     panel[2]=panel[2]+1
                     pl.subplot(panel[0],panel[1],panel[2])
-                    rg=np.nanmedian(idata)+np.array([-0.5,5])*std
+                    rg=np.nanmedian(subim['data'])+np.array([-0.5,5])*std
                     if rg[0]<0: rg[0]=0
                     if rg[1]<=rg[0]:
-                        rg=[np.nanmin(idata),np.nanmax(idata)]
-                    pl.imshow(idata,origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1],cmap="YlGn")
+                        rg=[np.nanmin(subim['data']),np.nanmax(subim['data'])]
+                    pl.imshow(subim['data'],origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1],cmap="YlGn")
                     ax=pl.gca()
                     ax.axes.get_xaxis().set_visible(False)
                     ax.axes.get_yaxis().set_visible(False)
@@ -1156,9 +1148,9 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
                     print(names[j])
 
             if offsetfrac>0:
-                raw0,bg0,f0,df0=r.photwiggle(im,offsetpix=offsetfrac*r.apdiam(im))
+                raw0,bg0,f0,df0=r.photwiggle(subim,offsetpix=offsetfrac*r.apdiam(subim))
             else:
-                raw0,bg0,f0,df0=r.phot(im)
+                raw0,bg0,f0,df0=r.phot(subim)
         raw.append(raw0)
         f.append(f0)
         df.append(df0)
@@ -1168,13 +1160,6 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
         pl.subplots_adjust(wspace=0.02,hspace=0.02,left=0.1,right=0.97,top=0.95,bottom=0.05)    
     return f,df,raw,bg
             
-
-
-
-#===========================================================================
-
-# test region transformations (radec, im space, masking)
-#r.selftest_dor(fig=False)
 
 
 
