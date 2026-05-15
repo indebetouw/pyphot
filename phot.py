@@ -3,6 +3,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 import pdb
 import numpy as np
+import scipy.ndimage as nd
 
 ### TODO replace hextract with spectral-cube.subcube
 ### https://github.com/radio-astro-tools/spectral-cube/
@@ -458,9 +459,9 @@ class Region:
         pa_rad=args[4]*np.pi/180 # to radians
         n=21
         t=np.arange(n)*2*np.pi/(n-1)
-        x0=args[2]*np.cos(t)+args[3]*np.sin(t)
-        y0=args[3]*np.cos(t)-args[2]*np.sin(t)
-        # rotate
+        y0=args[2]*np.cos(t)
+        x0=args[3]*np.sin(t)
+        # rotate - rotates clockwise by pa, but these are ra/dec so when ra increases to the left it is CCW
         y=np.cos(pa_rad)*y0 - np.sin(pa_rad)*x0
         x=np.cos(pa_rad)*x0 + np.sin(pa_rad)*y0
         # account for sky coordinates in ra - scale and recenter:
@@ -579,18 +580,6 @@ class Region:
                 #print "center of circle= %f %f" % ci[0:2]
                 r=ci[2] # in pix
                 pl.plot(ci[0]+r*ct, ci[1]+r*st)
-
-            # indicate north:  XXX TODO make general
-            # use origin=0 i.e. NOT FITS convention, but pl.imshow sets origin
-            # to 0,0 so do that here so we can overplot on pl.imshow axes
-            origin=0
-            c=self.bg1coords # only works below for circle
-            ctr=im['wcs'].wcs_world2pix([c[0:2]],origin)[0]
-            # north
-            ctr2=im['wcs'].wcs_world2pix([c[0:2]+np.array([c[2],0])],origin)[0]
-            pl.plot([ctr[0],ctr2[0]],[ctr[1],ctr2[1]])
-
-
 
     #-------------------------------------------------------
     def imcoords(self,im,reg="ap"):
@@ -995,6 +984,8 @@ def photfactor(w,h):
         return 7.e-06*4 # for 4x pixelization from 1s-2s 
     elif bunit=="IRSF":
         return 3.98e5 * pixsr
+    elif bunit=="K":
+        return 1.   # WRONG
     else:
         #return None
         raise Exception("don't understand your bunit")
@@ -1029,7 +1020,7 @@ def loadims(imfiles):
         imlist.append(im_entry)
     return imlist
         
-def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",offsetfrac=0,buffr=1.,scale="linear"):
+def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",offsetfrac=0,buffr=1.,scale="linear",rotate=False):
     """
     give me a region and an imlist and tell me whether to plot cutouts
     """
@@ -1057,34 +1048,15 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
             
             subim=hextract(imlist[j],xtents)
             ## ROTATE
-            rotate=False
             if rotate:
-                if subim['wcs'].has_crota():
-                    t0=subim['wcs'].crota[1]
-                elif subim['wcs'].has_cd():
-                    t0=np.arctan2(subim['wcs'].cd[0,1],-subim['wcs'].cd[0,0])*180/np.pi
-                else:
-                    t0=0.
-                    #print("WARN: assuming CROTA2=0")
-                theta=-1*t0
+                cd=subim['wcs'].pixel_scale_matrix
+                theta=-1*np.arctan2(cd[0,1],-cd[0,0])*180/np.pi
                 if np.absolute(theta)>1e-10:
+                    print("rotating crota by %f deg"%theta)
                     subim['data']=nd.rotate(subim['data'],theta,reshape=False)
-                    ct=np.cos(np.pi*theta/180)
-                    st=np.sin(np.pi*theta/180)
-                    if subim['wcs'].has_crota():
-                        subim['wcs'].crota[1]=subim['wcs'].crota[1]+theta
-                        subim['header']['CROTA2']=subim['wcs'].crota[1]
-                        print("rotating crota by "+str(theta))
-                    elif subim['wcs'].has_cd():
-                        subim['wcs'].cd=np.matrix(subim['wcs'].cd)*np.matrix([[ct,-st],[st,ct]])
-                        subim['header']['CD1_1']=subim['wcs'].cd[0,0]
-                        subim['header']['CD1_2']=subim['wcs'].cd[0,1]
-                        subim['header']['CD2_1']=subim['wcs'].cd[1,0]
-                        subim['header']['CD2_2']=subim['wcs'].cd[1,1]
-                        print("rotating cd    by "+str(theta))
-                        #else:
-                        #    print("WARN: not rotating CD")
-                        
+                    delt=np.sqrt(-np.linalg.det(cd))
+                    subim['wcs'].wcs.cd=np.array([[-delt,0],[0,delt]])
+                                            
             # ugh need minmax of aperture region...
             # estimate as inner 1/2 for now
             s=subim['data'].shape
@@ -1106,6 +1078,13 @@ def phot1(r,imlist,plot=True,names=None,panel=None,debug=None,showmask="both",of
                      rg=[np.nanmin(subim['data']),np.nanmax(subim['data'])]
                 if showmask==False or showmask=="both": # show the jet one 
                     pl.imshow(subim['data'],origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1])
+                    # show north:
+                    s=subim['data'].shape
+                    xy=[s[0]*0.1,s[1]*0.25]
+                    rd=subim['wcs'].wcs_pix2world([xy],0)[0]
+                    # TODO SCALE length to size of aperture or of subim itself
+                    xyn=subim['wcs'].wcs_world2pix([[rd[0],rd[1]+0.01]],0)[0]
+                    pl.arrow(xy[0],xy[1],xyn[0]-xy[0],xyn[1]-xy[1],color='w',width=2)
                 elif showmask==True: # only show the mask
                     pl.imshow(subim['data'],origin="lower",interpolation="nearest",vmin=rg[0],vmax=rg[1],cmap="YlGn")
                 ax=pl.gca()
