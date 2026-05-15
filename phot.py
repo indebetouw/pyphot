@@ -48,6 +48,10 @@ def hextract(im,crds,outfile=None):
     hdrout['crpix2']=0.5*(y1-y0)
     hdrout['crval1']=ctr[0]
     hdrout['crval2']=ctr[1]
+    # check this
+    if "GLON" in hdrout['CTYPE1']:
+        hdrout['CTYPE1']='GLON' # not sure why its cranky about "-CAR"
+        hdrout['CTYPE2']='GLAT' # not sure why its cranky about "-CAR"
     # wcsout=WCS(hdrout)
     wcsout=im['wcs'].deepcopy()
     wcsout.wcs.crval=ctr
@@ -433,7 +437,7 @@ def photcombine(a_wave,a_f,a_df,a_fl,c_wave,c_f,c_df,c_fl,f_wave,f_dwave,edit=Fa
 class Region:
     def __init__(self):
         self.bgfact=[2,2.5]  # bg annulus radii as multipliers of phot rad.
-        self.type=None
+        self.typ=None
         self.coords=[]
         self.bg0coords=[] # inner part of annulus
         self.bg1coords=[] # outer part of annulus
@@ -446,7 +450,7 @@ class Region:
         args array = [ra,dec,rad in decimal degrees]
         """
         # TODO add radius units?
-        self.type="circle"
+        self.typ="circle"
         self.coords=np.array(args)
         self.setbgcoords()
 
@@ -455,7 +459,7 @@ class Region:
         """
         args array = [ra,dec,bmaj,bmin,pa in decimal degrees]
         """
-        self.type="polygon"
+        self.typ="polygon"
         pa_rad=args[4]*np.pi/180 # to radians
         n=21
         t=np.arange(n)*2*np.pi/(n-1)
@@ -476,7 +480,7 @@ class Region:
         """
         ra1,de1,ra2,de2... in decimal degrees
         """
-        self.type="polygon"
+        self.typ="polygon"
         n=len(coordarr)//2
         c=np.array(coordarr)
         xi=2*np.array(range(n))
@@ -517,9 +521,9 @@ class Region:
       
     #-------------------------------------------------------
     def setbgcoords(self):
-        if self.type==None: 
-            raise Exception("region type=None - has it been set?")
-        if self.type=="circle":
+        if self.typ==None: 
+            raise Exception("region typ=None - has it been set?")
+        if self.typ=="circle":
             if len(self.coords)!=3:
                 raise Exception("region coords should be ctr_ra, ctr_dec, rad_deg - the coord array has unexpected length %d" % len(self.coords))
             self.bg0coords=np.array(self.coords)
@@ -527,7 +531,7 @@ class Region:
             # set larger radii for annulus
             self.bg0coords[2]=self.coords[2]*self.bgfact[0]
             self.bg1coords[2]=self.coords[2]*self.bgfact[1]
-        elif self.type=="polygon":
+        elif self.typ=="polygon":
             n=self.coords.shape[1]
             self.coords=np.array(self.coords)
             ctr=[ self.coords[:,0].mean(), self.coords[:,1].mean() ]
@@ -543,15 +547,15 @@ class Region:
             self.bg0coords=np.array([r*b[0]*ct, r*b[0]*st]).T+ctr
             self.bg1coords=np.array([r*b[1]*ct, r*b[1]*st]).T+ctr
             
-        else: raise Exception("unknown region type %s" % self.type)
+        else: raise Exception("unknown region typ %s" % self.typ)
 
     #-------------------------------------------------------
     def plotradec(self):
-        if self.type=="polygon":
+        if self.typ=="polygon":
             pl.plot(self.coords[:,0]   ,self.coords[:,1])
             pl.plot(self.bg0coords[:,0],self.bg0coords[:,1])
             pl.plot(self.bg1coords[:,0],self.bg1coords[:,1])
-        elif self.type=="circle":
+        elif self.typ=="circle":
             n=23
             t=np.arange(n)*np.pi*2/n
             r=self.coords[2]
@@ -566,11 +570,11 @@ class Region:
 
     #-------------------------------------------------------
     def plotimx(self,im):
-        if self.type=="polygon":
+        if self.typ=="polygon":
             for reg in ("ap","bg0","bg1"):
                 ci=self.imcoords(im,reg=reg)
                 pl.plot(ci[:,0],ci[:,1])
-        elif self.type=="circle":
+        elif self.typ=="circle":
             n=33
             t=np.arange(n)*np.pi*2/n            
             ct=np.cos(t)
@@ -597,7 +601,7 @@ class Region:
         else: raise Exception("unknown input reg=%s" % reg)
 
         origin=0
-        if self.type=="circle":
+        if self.typ=="circle":
             ctr=im['wcs'].wcs_world2pix([c[0:2]],origin)[0]
             # I couldn't find a simple way to convert from deg to pix
             # probably because it only is well-defined if the pixels are square
@@ -605,9 +609,9 @@ class Region:
             ctr2=im['wcs'].wcs_world2pix([c[0:2]+np.array([0,c[2]])],origin)[0]
             rad=ctr2[1]-ctr[1] 
             return ctr[0],ctr[1],rad # should all be in pix now
-        elif self.type=="polygon":
+        elif self.typ=="polygon":
             return im['wcs'].wcs_world2pix(c,origin)
-        else: raise Exception("unknown region type %s" % self.type)
+        else: raise Exception("unknown region typ %s" % self.typ)
                 
 
     #-------------------------------------------------------
@@ -616,9 +620,9 @@ class Region:
         diam of phot ap in pixels 
         """
         ca=self.imcoords(im,reg="ap")
-        if self.type=="circle":
+        if self.typ=="circle":
             diam=2*ca[2]
-        elif self.type=="polygon":                
+        elif self.typ=="polygon":                
             dx=[np.min(ca[:,0]),np.max(ca[:,0])]
             dy=[np.min(ca[:,1]),np.max(ca[:,1])]
             ddx=dx[1]-dx[0]
@@ -634,11 +638,11 @@ class Region:
         """
         ca=self.imcoords(im,reg="ap")
         c1=self.imcoords(im,reg="bg1") # outer bg
-        if self.type=="circle":
+        if self.typ=="circle":
             dr=ca[2]
             xra=c1[0] + (dr*buffr+ c1[2])*np.array([-1,1])
             yra=c1[1] + (dr*buffr+ c1[2])*np.array([-1,1])
-        elif self.type=="polygon":                
+        elif self.typ=="polygon":                
             dx=[np.min(ca[:,0]),np.max(ca[:,0])]
             dy=[np.min(ca[:,1]),np.max(ca[:,1])]
             ctr=[np.mean(dx),np.mean(dy)]
@@ -681,7 +685,7 @@ class Region:
         imshape=im['data'].shape
         mask=np.zeros(imshape)
         
-        if self.type=="circle":
+        if self.typ=="circle":
             x,y,r=self.imcoords(im) 
             x0=int(x); y0=int(y)
             dx=x-x0+offset[0]  # fractional pixel offsets
@@ -711,7 +715,7 @@ class Region:
 #                        if x0+i==6: 
 #                           print i,j,x0+i,y0+j,dx,dy,d2,bg0_r2,bg1_r2
                         
-        elif self.type=="polygon":
+        elif self.typ=="polygon":
             # turn annulus back into mask, will trim at edges of image
             from matplotlib.path import Path
             from matplotlib import __version__ as mpver
@@ -736,7 +740,7 @@ class Region:
             mask = mask.reshape((imshape[0],imshape[1]))
                         
             mask = mask + (1*mask1-1*mask0)*2 
-        else: raise Exception("unknown region type %s" % self.type)
+        else: raise Exception("unknown region typ %s" % self.typ)
         self.mask=mask
         return mask
 
@@ -984,6 +988,18 @@ def photfactor(w,h):
         return 7.e-06*4 # for 4x pixelization from 1s-2s 
     elif bunit=="IRSF":
         return 3.98e5 * pixsr
+    elif bunit=="W/M^2-SR":
+        # MSX
+        if h["BAND"]=="A":
+            bw=3.36 * 2.9979246e14/8.28**2
+        elif h["BAND"]=="C":
+            bw=1.72 * 2.9979246e14/12.13**2
+        elif h["BAND"]=="D":
+            bw=2.23 * 2.9979246e14/14.65**2
+        elif h.["BAND"]=="E":
+        bw=6.24 * 2.9979246e14/21.34**2    
+        return 1000/bw*1e23 * pixsr
+    
     elif bunit=="K":
         return 1.   # WRONG
     else:
@@ -1006,7 +1022,7 @@ def loadims(imfiles):
         if len(hdu)>1: i=1 # some issues with multi-extension - the first is None
         while len(hdu[i].data)<1: i=i+1
         w=WCS(hdu[i].header)
-        axlist=w.get_axis_types()
+        axlist=w.get_axis_typs()
         while w.naxis>2:
             if axlist[-1]['coordinate_type']!="celestial":
                 w=w.dropaxis(-1)
